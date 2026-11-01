@@ -1,7 +1,7 @@
 # Team Task Board
 
 Shared kanban board for a small team, hosted on Netlify. Stages: Not started, In progress,
-Almost done, Done, Live. Everyone with the team passcode can add, edit, drag and delete tasks.
+Almost done, Done (Awaiting approval), Live. Everyone with the team passcode can add, edit, drag and delete tasks.
 
 ## Architecture
 

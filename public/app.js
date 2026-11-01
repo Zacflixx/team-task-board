@@ -10,7 +10,7 @@
     { id: "todo", name: "Not started", color: "--s-todo" },
     { id: "progress", name: "In progress", color: "--s-prog" },
     { id: "almost", name: "Almost done", color: "--s-almost" },
-    { id: "done", name: "Done", color: "--s-done" },
+    { id: "done", name: "Done (Awaiting approval)", color: "--s-done" },
     { id: "live", name: "Live", color: "--s-live" }
   ];
   var STAGE_IDS = STAGES.map(function (s) { return s.id; });
@@ -362,10 +362,11 @@
   function renderSummary() {
     var total = tasks.length;
     var open = tasks.filter(function (t) { return t.status !== "done" && t.status !== "live"; }).length;
+    var done = tasks.filter(function (t) { return t.status === "done"; }).length;
     var live = tasks.filter(function (t) { return t.status === "live"; }).length;
     var text;
     if (!total) text = loaded ? "Nothing tracked yet" : (locked ? "Locked" : (offline ? "Can't reach the board" : "Loading tasks"));
-    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + live + " live";
+    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + done + " done · " + live + " live";
     $("#summary").textContent = text;
   }
 
