@@ -1,0 +1,686 @@
+<title>Team Task Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: slim header, five stage columns in one horizontally scrolling row (stacked cards inside each), modal dialog for add and edit. */
+:root {
+  --bg: #edf1f2;
+  --surface: #ffffff;
+  --surface-2: #f4f7f8;
+  --ink: #12222a;
+  --muted: #566a74;
+  --line: #d3dce0;
+  --accent: #0e6f80;
+  --accent-ink: #ffffff;
+  --danger: #b3261e;
+  --scrim: rgba(10, 22, 28, 0.5);
+  --s-todo: #74868f;
+  --s-prog: #2f6bdb;
+  --s-almost: #c07000;
+  --s-done: #23864f;
+  --s-live: #8250df;
+  --font-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e191e;
+    --surface: #172830;
+    --surface-2: #12212a;
+    --ink: #e6eef1;
+    --muted: #93a8b2;
+    --line: #2a3f48;
+    --accent: #4cc3d6;
+    --accent-ink: #06222a;
+    --danger: #ff8a80;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --s-todo: #8fa2ab;
+    --s-prog: #6c9bff;
+    --s-almost: #f0a73a;
+    --s-done: #4cc17f;
+    --s-live: #b392ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e191e;
+  --surface: #172830;
+  --surface-2: #12212a;
+  --ink: #e6eef1;
+  --muted: #93a8b2;
+  --line: #2a3f48;
+  --accent: #4cc3d6;
+  --accent-ink: #06222a;
+  --danger: #ff8a80;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --s-todo: #8fa2ab;
+  --s-prog: #6c9bff;
+  --s-almost: #f0a73a;
+  --s-done: #4cc17f;
+  --s-live: #b392ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 22px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1500px; margin: 0 auto; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; }
+.titles { min-width: 0; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.1; letter-spacing: -0.015em; margin: 0 0 4px; text-wrap: balance; }
+.sub { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); margin: 0; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+
+.sync { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.sync[data-state="synced"] i { background: var(--s-done); }
+.sync[data-state="offline"] i { background: var(--s-almost); }
+.sync[data-state="readonly"] i { background: var(--s-prog); }
+
+.btn { font: inherit; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, .card:focus-visible, .iconbtn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--danger); }
+.btn.danger.armed { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+.btn[disabled] { opacity: 0.6; cursor: default; }
+
+.empty-strip { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.empty-strip p { margin: 0; min-width: 0; }
+.empty-strip strong { font-family: var(--font-display); font-size: 17px; display: block; }
+.empty-strip span { color: var(--muted); }
+
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 14px; align-items: start; overflow-x: auto; padding-bottom: 14px; scroll-snap-type: x proximity; }
+.col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; min-width: 0; scroll-snap-align: start; }
+.col.over { border-color: var(--accent); }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 14px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--stage); }
+.col[data-status="live"] .dot { box-shadow: 0 0 0 0 var(--stage); animation: pulse 2.4s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stage) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
+@media (prefers-reduced-motion: reduce) { .col[data-status="live"] .dot { animation: none; } }
+.col-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; }
+.count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.iconbtn { font: inherit; line-height: 1; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
+.iconbtn:hover { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.col-head .iconbtn { margin-left: auto; font-size: 18px; }
+
+.list { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; min-height: 96px; }
+.hint { margin: 0; padding: 14px 12px; font-size: 13px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; }
+.drop-line { height: 3px; border-radius: 2px; background: var(--accent); flex: none; margin: -1px 0; }
+
+.card { display: grid; gap: 7px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px 8px 12px; cursor: grab; min-width: 0; }
+.card:hover { border-color: var(--muted); }
+.card.dragging { opacity: 0.45; }
+.readonly .card { cursor: pointer; }
+.card h3 { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.notes { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.card-foot { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 24px; }
+.owner { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--muted); }
+.owner b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { width: 20px; height: 20px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 10px; font-weight: 600; color: #fff; background: hsl(var(--h) 42% 38%); }
+.moves { margin-left: auto; display: inline-flex; gap: 2px; flex: none; }
+.moves .iconbtn { width: 26px; height: 26px; font-size: 15px; }
+.moves .iconbtn[disabled] { opacity: 0.3; cursor: default; pointer-events: none; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.modal { width: min(540px, 100%); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 14px; }
+.modal h2 { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 600; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.field input, .field textarea, .field select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; width: 100%; min-width: 0; }
+.field textarea { min-height: 100px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.form-err { margin: 0; color: var(--danger); font-size: 13px; min-height: 0; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.grow { flex: 1; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: min(420px, calc(100% - 32px)); background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 8px; font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 26px; }
+  .board { grid-auto-columns: 86%; }
+}
+</style>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="titles">
+      <h1>Team Task Board</h1>
+      <p class="sub" id="summary">Loading tasks</p>
+    </div>
+    <div class="tools">
+      <span class="sync" id="sync" data-state="connecting"><i></i><span>Connecting</span></span>
+      <button type="button" class="btn primary" id="addBtn">New task</button>
+    </div>
+  </header>
+
+  <div class="empty-strip" id="empty" hidden>
+    <p><strong id="emptyTitle"></strong><span id="emptyText"></span></p>
+    <button type="button" class="btn" id="emptyBtn">Add the first task</button>
+  </div>
+
+  <main class="board" id="board" aria-label="Task board"></main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <form class="modal" id="form" role="dialog" aria-modal="true" aria-labelledby="dlgTitle" novalidate>
+    <h2 id="dlgTitle">New task</h2>
+    <div class="field">
+      <label for="fTitle">Task</label>
+      <input id="fTitle" maxlength="140" autocomplete="off" placeholder="What needs to happen?">
+    </div>
+    <div class="field">
+      <label for="fNotes">Notes</label>
+      <textarea id="fNotes" maxlength="1000" placeholder="Links, context, what done looks like"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fOwner">Owner</label>
+        <input id="fOwner" list="owners" maxlength="40" autocomplete="off" placeholder="Who is on it?">
+        <datalist id="owners"></datalist>
+      </div>
+      <div class="field">
+        <label for="fStatus">Stage</label>
+        <select id="fStatus"></select>
+      </div>
+    </div>
+    <p class="form-err" id="fErr" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" class="btn danger" id="delBtn" hidden>Delete task</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary" id="saveBtn">Save task</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  var STAGES = [
+    { id: "todo", name: "Not started", color: "--s-todo" },
+    { id: "progress", name: "In progress", color: "--s-prog" },
+    { id: "almost", name: "Almost done", color: "--s-almost" },
+    { id: "done", name: "Done", color: "--s-done" },
+    { id: "live", name: "Live", color: "--s-live" }
+  ];
+  var STAGE_IDS = STAGES.map(function (s) { return s.id; });
+  var $ = function (s) { return document.querySelector(s); };
+
+  var db = null;
+  var canWrite = true;
+  var tasks = [];
+  var byId = {};
+  var synced = false;
+  var dbMissing = false;
+  var dragId = null;
+  var pendingRender = false;
+  var busy = {};
+  var editingId = null;
+  var dialogReadOnly = false;
+  var lastFocus = null;
+  var toastTimer = null;
+  var delTimer = null;
+
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        var v = attrs[k];
+        if (v === null || v === undefined || v === false) return;
+        if (k === "class") el.className = v;
+        else if (k === "text") el.textContent = v;
+        else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v === true ? "" : v);
+      });
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var kid = arguments[i];
+      if (kid === null || kid === undefined || kid === false) continue;
+      el.append(kid);
+    }
+    return el;
+  }
+
+  function stageIndex(id) { return STAGE_IDS.indexOf(id); }
+  function stageName(id) { var i = stageIndex(id); return i >= 0 ? STAGES[i].name : id; }
+
+  function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  function toast(msg) {
+    var t = $("#toast");
+    t.textContent = msg;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 4200);
+  }
+
+  function setSync(state) {
+    var el = $("#sync");
+    el.dataset.state = state;
+    var labels = {
+      connecting: "Connecting",
+      synced: "Synced with team",
+      offline: "Can't reach shared data",
+      readonly: "View only",
+      unavailable: "Not connected"
+    };
+    el.lastElementChild.textContent = labels[state] || "";
+  }
+
+  function hue(s) {
+    var n = 0;
+    for (var i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) % 360;
+    return n;
+  }
+  function initials(name) {
+    var parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    var a = Array.from(parts[0])[0] || "";
+    var b = parts.length > 1 ? (Array.from(parts[parts.length - 1])[0] || "") : "";
+    return (a + b).toUpperCase();
+  }
+
+  function sorted(list) {
+    return list.slice().sort(function (a, b) {
+      return (a.order - b.order) || (a.id < b.id ? -1 : 1);
+    });
+  }
+  function column(status, exceptId) {
+    return sorted(tasks.filter(function (t) { return t.status === status && t.id !== exceptId; }));
+  }
+
+  /* ---------- rendering ---------- */
+
+  function renderSummary() {
+    var total = tasks.length;
+    var open = tasks.filter(function (t) { return t.status !== "done" && t.status !== "live"; }).length;
+    var live = tasks.filter(function (t) { return t.status === "live"; }).length;
+    var text;
+    if (!total) text = synced ? "Nothing tracked yet" : (dbMissing ? "Shared board unavailable" : "Loading tasks");
+    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + live + " live";
+    $("#summary").textContent = text;
+  }
+
+  function renderEmpty() {
+    var box = $("#empty");
+    if (tasks.length) { box.hidden = true; return; }
+    box.hidden = false;
+    var btn = $("#emptyBtn");
+    if (dbMissing) {
+      $("#emptyTitle").textContent = "The shared board isn't available here";
+      $("#emptyText").textContent = "Open this page in Claude while signed in to see and edit the team's tasks.";
+      btn.hidden = true;
+    } else if (!synced) {
+      $("#emptyTitle").textContent = "Loading the team's tasks";
+      $("#emptyText").textContent = "This takes a few seconds the first time you open the board.";
+      btn.hidden = true;
+    } else {
+      $("#emptyTitle").textContent = "No tasks yet";
+      $("#emptyText").textContent = "Add the first one. Everyone with access sees it as soon as it saves.";
+      btn.hidden = !canWrite;
+    }
+  }
+
+  function render() {
+    if (dragId) { pendingRender = true; return; }
+    pendingRender = false;
+    var board = $("#board");
+    var scroll = board.scrollLeft;
+    board.replaceChildren();
+    board.classList.toggle("readonly", !canWrite);
+
+    STAGES.forEach(function (s) {
+      var items = column(s.id);
+      var list = h("div", { class: "list" });
+      var col = h("section", { class: "col", "data-status": s.id, "aria-label": s.name },
+        h("div", { class: "col-head" },
+          h("span", { class: "dot" }),
+          h("h2", { class: "col-name", text: s.name }),
+          h("span", { class: "count", text: String(items.length) }),
+          canWrite ? h("button", { type: "button", class: "iconbtn", "aria-label": "Add a task to " + s.name, title: "Add a task here", text: "+", onclick: function () { openDialog(null, s.id); } }) : null
+        ),
+        list
+      );
+      col.style.setProperty("--stage", "var(" + s.color + ")");
+
+      if (!items.length) list.append(h("p", { class: "hint", text: canWrite ? "Drop a task here or press +" : "No tasks here" }));
+      items.forEach(function (t) { list.append(cardEl(t)); });
+
+      list.addEventListener("dragover", function (e) { onDragOver(e, list, col, s.id); });
+      list.addEventListener("drop", function (e) { onDrop(e, s.id); });
+      col.addEventListener("dragleave", function (e) {
+        if (!col.contains(e.relatedTarget)) col.classList.remove("over");
+      });
+      board.append(col);
+    });
+
+    board.scrollLeft = scroll;
+    renderSummary();
+    renderEmpty();
+    fillOwners();
+  }
+
+  function cardEl(t) {
+    var idx = stageIndex(t.status);
+    var card = h("div", {
+      class: "card", tabindex: "0", role: "button", "data-id": t.id,
+      "aria-label": "Open task: " + t.title,
+      draggable: canWrite ? "true" : null
+    });
+    card.append(h("h3", { text: t.title }));
+    if (t.notes) card.append(h("p", { class: "notes", text: t.notes }));
+
+    var foot = h("div", { class: "card-foot" });
+    if (t.owner) {
+      var av = h("span", { class: "avatar", text: initials(t.owner), "aria-hidden": "true" });
+      av.style.setProperty("--h", String(hue(t.owner)));
+      foot.append(h("span", { class: "owner" }, av, h("b", { text: t.owner })));
+    }
+    if (canWrite) {
+      var prev = idx > 0 ? STAGES[idx - 1] : null;
+      var next = idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
+      foot.append(h("span", { class: "moves" },
+        h("button", { type: "button", class: "iconbtn", text: "‹", disabled: prev ? null : true, "aria-label": prev ? "Move back to " + prev.name : "Already at the first stage", title: prev ? "Move back to " + prev.name : "", onclick: function (e) { e.stopPropagation(); if (prev) step(t, prev.id); } }),
+        h("button", { type: "button", class: "iconbtn", text: "›", disabled: next ? null : true, "aria-label": next ? "Move forward to " + next.name : "Already at the last stage", title: next ? "Move forward to " + next.name : "", onclick: function (e) { e.stopPropagation(); if (next) step(t, next.id); } })
+      ));
+    }
+    card.append(foot);
+
+    card.addEventListener("click", function (e) {
+      if (e.target.closest(".moves")) return;
+      openDialog(t.id);
+    });
+    card.addEventListener("keydown", function (e) {
+      if (e.target !== card) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDialog(t.id); }
+    });
+    card.addEventListener("dragstart", function (e) {
+      if (!canWrite) { e.preventDefault(); return; }
+      dragId = t.id;
+      e.dataTransfer.setData("text/plain", t.id);
+      e.dataTransfer.effectAllowed = "move";
+      setTimeout(function () { card.classList.add("dragging"); }, 0);
+    });
+    card.addEventListener("dragend", function () {
+      dragId = null;
+      clearDragUi();
+      if (pendingRender) render();
+    });
+    return card;
+  }
+
+  /* ---------- drag and drop ---------- */
+
+  var placeholder = h("div", { class: "drop-line" });
+
+  function clearDragUi() {
+    if (placeholder.parentNode) placeholder.remove();
+    document.querySelectorAll(".col.over").forEach(function (c) { c.classList.remove("over"); });
+    document.querySelectorAll(".card.dragging").forEach(function (c) { c.classList.remove("dragging"); });
+  }
+
+  function autoscroll(e) {
+    var board = $("#board");
+    var r = board.getBoundingClientRect();
+    if (e.clientX < r.left + 60) board.scrollLeft -= 18;
+    else if (e.clientX > r.right - 60) board.scrollLeft += 18;
+  }
+
+  function onDragOver(e, list, col, status) {
+    if (!dragId || !canWrite) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    autoscroll(e);
+    document.querySelectorAll(".col.over").forEach(function (c) { if (c !== col) c.classList.remove("over"); });
+    col.classList.add("over");
+    var cards = Array.prototype.filter.call(list.querySelectorAll(".card"), function (c) { return c.dataset.id !== dragId; });
+    var before = null;
+    for (var i = 0; i < cards.length; i++) {
+      var r = cards[i].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) { before = cards[i]; break; }
+    }
+    if (before) list.insertBefore(placeholder, before);
+    else list.append(placeholder);
+    placeholder.dataset.status = status;
+  }
+
+  function neighborCard(el, dir) {
+    var n = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+    while (n && (!n.classList.contains("card") || n.classList.contains("dragging"))) {
+      n = dir < 0 ? n.previousElementSibling : n.nextElementSibling;
+    }
+    return n;
+  }
+
+  function onDrop(e, status) {
+    if (!dragId || !canWrite) return;
+    e.preventDefault();
+    var id = dragId;
+    var t = byId[id];
+    var prevEl = placeholder.parentNode ? neighborCard(placeholder, -1) : null;
+    var nextEl = placeholder.parentNode ? neighborCard(placeholder, 1) : null;
+    clearDragUi();
+    if (!t) return;
+    var others = column(status, id);
+    var prev = prevEl ? byId[prevEl.dataset.id] : null;
+    var next = nextEl ? byId[nextEl.dataset.id] : null;
+
+    if (t.status === status) {
+      var seq = others.map(function (x) { return x.id; });
+      var at = next ? seq.indexOf(next.id) : seq.length;
+      if (at < 0) at = seq.length;
+      seq.splice(at, 0, id);
+      var now = column(status).map(function (x) { return x.id; });
+      if (seq.join("|") === now.join("|")) return;
+    }
+
+    var order;
+    if (prev && next) order = (prev.order + next.order) / 2;
+    else if (prev) order = prev.order + 1;
+    else if (next) order = next.order - 1;
+    else order = Date.now();
+    save(id, { status: status, order: order });
+  }
+
+  function step(t, status) {
+    save(t.id, { status: status, order: Date.now() });
+  }
+
+  /* ---------- writes ---------- */
+
+  function writeError(e) {
+    var code = e && e.code;
+    if (code === "invalid_argument") toast("That didn't save. The task may have been removed, or you only have view access.");
+    else if (code === "quota_exceeded") toast("The board is full. Delete finished tasks to make room.");
+    else if (code === "revoked") toast("Your access to this board changed. Reload the page.");
+    else toast("Couldn't save that change. Try again in a moment.");
+  }
+
+  function save(id, patch) {
+    if (!db) { toast("The shared board isn't connected yet."); return Promise.resolve(false); }
+    if (busy[id]) { toast("Still saving the last change to that task."); return Promise.resolve(false); }
+    busy[id] = true;
+    var data = Object.assign({}, patch, { updatedAt: Date.now() });
+    return db.doc("tasks/" + id).update(data).then(function () { return true; }, function (e) { writeError(e); return false; }).then(function (ok) { delete busy[id]; return ok; });
+  }
+
+  /* ---------- dialog ---------- */
+
+  function fillOwners() {
+    var seen = {};
+    var dl = $("#owners");
+    dl.replaceChildren();
+    tasks.forEach(function (t) {
+      if (t.owner && !seen[t.owner]) { seen[t.owner] = 1; dl.append(h("option", { value: t.owner })); }
+    });
+  }
+
+  function openDialog(id, status) {
+    var t = id ? byId[id] : null;
+    if (id && !t) return;
+    if (!id && !canWrite) return;
+    editingId = id;
+    dialogReadOnly = !canWrite;
+    lastFocus = document.activeElement;
+    var sel = $("#fStatus");
+    sel.replaceChildren();
+    STAGES.forEach(function (s) { sel.append(h("option", { value: s.id, text: s.name })); });
+
+    $("#dlgTitle").textContent = dialogReadOnly ? "Task details" : (t ? "Edit task" : "New task");
+    $("#fTitle").value = t ? t.title : "";
+    $("#fNotes").value = t ? t.notes : "";
+    $("#fOwner").value = t ? t.owner : lsGet("tb-owner");
+    sel.value = t ? t.status : (status || "todo");
+    $("#fErr").textContent = "";
+    ["#fTitle", "#fNotes", "#fOwner", "#fStatus"].forEach(function (s) { $(s).disabled = dialogReadOnly; });
+    $("#saveBtn").hidden = dialogReadOnly;
+    $("#saveBtn").disabled = false;
+    $("#cancelBtn").textContent = dialogReadOnly ? "Close" : "Cancel";
+    resetDelete();
+    $("#delBtn").hidden = dialogReadOnly || !t;
+    $("#overlay").hidden = false;
+    setTimeout(function () { (dialogReadOnly ? $("#cancelBtn") : $("#fTitle")).focus(); }, 0);
+  }
+
+  function closeDialog() {
+    $("#overlay").hidden = true;
+    editingId = null;
+    resetDelete();
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
+  }
+
+  function resetDelete() {
+    clearTimeout(delTimer);
+    var b = $("#delBtn");
+    b.classList.remove("armed");
+    b.textContent = "Delete task";
+  }
+
+  $("#form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (dialogReadOnly) return;
+    var title = $("#fTitle").value.trim();
+    if (!title) { $("#fErr").textContent = "Give the task a title."; $("#fTitle").focus(); return; }
+    var notes = $("#fNotes").value.trim();
+    var owner = $("#fOwner").value.trim();
+    var status = $("#fStatus").value;
+    if (STAGE_IDS.indexOf(status) < 0) status = "todo";
+    lsSet("tb-owner", owner);
+    var btn = $("#saveBtn");
+    btn.disabled = true;
+    var p;
+    if (editingId) {
+      var cur = byId[editingId];
+      var patch = { title: title, notes: notes, owner: owner, status: status };
+      if (cur && cur.status !== status) patch.order = Date.now();
+      p = save(editingId, patch);
+    } else {
+      if (!db) { toast("The shared board isn't connected yet."); btn.disabled = false; return; }
+      var now = Date.now();
+      p = db.collection("tasks").add({ title: title, notes: notes, owner: owner, status: status, order: now, createdAt: now, updatedAt: now })
+        .then(function () { return true; }, function (err) { writeError(err); return false; });
+    }
+    p.then(function (ok) {
+      btn.disabled = false;
+      if (ok) closeDialog();
+    });
+  });
+
+  $("#delBtn").addEventListener("click", function () {
+    var b = $("#delBtn");
+    if (!b.classList.contains("armed")) {
+      b.classList.add("armed");
+      b.textContent = "Click again to delete";
+      delTimer = setTimeout(resetDelete, 4000);
+      return;
+    }
+    var id = editingId;
+    if (!id || !db) return;
+    b.disabled = true;
+    db.doc("tasks/" + id).delete().then(function () {
+      b.disabled = false;
+      closeDialog();
+      toast("Task deleted.");
+    }, function (e) { b.disabled = false; resetDelete(); writeError(e); });
+  });
+
+  $("#cancelBtn").addEventListener("click", closeDialog);
+  $("#overlay").addEventListener("mousedown", function (e) { if (e.target === $("#overlay")) closeDialog(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("#overlay").hidden) closeDialog();
+  });
+  $("#addBtn").addEventListener("click", function () { openDialog(null, "todo"); });
+  $("#emptyBtn").addEventListener("click", function () { openDialog(null, "todo"); });
+
+  /* ---------- shared data ---------- */
+
+  function onTasks(snap) {
+    var next = [];
+    var map = {};
+    snap.docs.forEach(function (d) {
+      var v = d.data() || {};
+      var status = STAGE_IDS.indexOf(v.status) >= 0 ? v.status : "todo";
+      var t = {
+        id: d.id,
+        title: typeof v.title === "string" && v.title ? v.title : "Untitled task",
+        notes: typeof v.notes === "string" ? v.notes : "",
+        owner: typeof v.owner === "string" ? v.owner : "",
+        status: status,
+        order: typeof v.order === "number" ? v.order : 0
+      };
+      next.push(t);
+      map[d.id] = t;
+    });
+    tasks = next;
+    byId = map;
+    if (!snap.metadata.fromCache) {
+      synced = true;
+      clearTimeout(loadTimer);
+      setSync(canWrite ? "synced" : "readonly");
+    }
+    render();
+  }
+
+  var loadTimer = null;
+
+  function connect() {
+    var api = window.claude && window.claude.use ? window.claude : null;
+    if (!api) { dbMissing = true; setSync("unavailable"); render(); return; }
+    Promise.all([api.use("db"), api.use("user")]).then(function (res) {
+      db = res[0];
+      var user = res[1];
+      if (!db) { dbMissing = true; setSync("unavailable"); render(); return; }
+      var perm = user && user.can ? user.can("data.write") : Promise.resolve(null);
+      return perm.then(function (can) {
+        canWrite = can !== false;
+        $("#addBtn").hidden = !canWrite;
+        loadTimer = setTimeout(function () { if (!synced) setSync("offline"); }, 10000);
+        db.collection("tasks").onSnapshot(onTasks, function () {
+          clearTimeout(loadTimer);
+          setSync("offline");
+        });
+        render();
+      });
+    }).catch(function () { dbMissing = true; setSync("unavailable"); render(); });
+  }
+
+  render();
+  connect();
+})();
+</script>

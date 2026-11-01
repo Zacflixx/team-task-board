@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+html { color-scheme: light; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+</style>
+<title>Team Task Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: slim header, five stage columns in one horizontally scrolling row (stacked cards inside each), modal dialog for add and edit. */
+:root {
+  --bg: #edf1f2;
+  --surface: #ffffff;
+  --surface-2: #f4f7f8;
+  --ink: #12222a;
+  --muted: #566a74;
+  --line: #d3dce0;
+  --accent: #0e6f80;
+  --accent-ink: #ffffff;
+  --danger: #b3261e;
+  --scrim: rgba(10, 22, 28, 0.5);
+  --s-todo: #74868f;
+  --s-prog: #2f6bdb;
+  --s-almost: #c07000;
+  --s-done: #23864f;
+  --s-live: #8250df;
+  --font-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e191e;
+    --surface: #172830;
+    --surface-2: #12212a;
+    --ink: #e6eef1;
+    --muted: #93a8b2;
+    --line: #2a3f48;
+    --accent: #4cc3d6;
+    --accent-ink: #06222a;
+    --danger: #ff8a80;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --s-todo: #8fa2ab;
+    --s-prog: #6c9bff;
+    --s-almost: #f0a73a;
+    --s-done: #4cc17f;
+    --s-live: #b392ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e191e;
+  --surface: #172830;
+  --surface-2: #12212a;
+  --ink: #e6eef1;
+  --muted: #93a8b2;
+  --line: #2a3f48;
+  --accent: #4cc3d6;
+  --accent-ink: #06222a;
+  --danger: #ff8a80;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --s-todo: #8fa2ab;
+  --s-prog: #6c9bff;
+  --s-almost: #f0a73a;
+  --s-done: #4cc17f;
+  --s-live: #b392ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-block: 22px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1500px; margin: 0 auto; }
+
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 18px; }
+.titles { min-width: 0; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.1; letter-spacing: -0.015em; margin: 0 0 4px; text-wrap: balance; }
+.sub { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); margin: 0; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+
+.sync { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.sync[data-state="synced"] i { background: var(--s-done); }
+.sync[data-state="offline"] i { background: var(--s-almost); }
+.sync[data-state="readonly"] i { background: var(--s-prog); }
+
+.btn { font: inherit; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn:focus-visible, .card:focus-visible, .iconbtn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--danger); }
+.btn.danger.armed { background: var(--danger); border-color: var(--danger); color: var(--bg); }
+.btn[disabled] { opacity: 0.6; cursor: default; }
+
+.empty-strip { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.empty-strip p { margin: 0; min-width: 0; }
+.empty-strip strong { font-family: var(--font-display); font-size: 17px; display: block; }
+.empty-strip span { color: var(--muted); }
+
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 14px; align-items: start; overflow-x: auto; padding-bottom: 14px; scroll-snap-type: x proximity; }
+.col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; min-width: 0; scroll-snap-align: start; }
+.col.over { border-color: var(--accent); }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 12px 10px 8px 14px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--stage); }
+.col[data-status="live"] .dot { box-shadow: 0 0 0 0 var(--stage); animation: pulse 2.4s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stage) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
+@media (prefers-reduced-motion: reduce) { .col[data-status="live"] .dot { animation: none; } }
+.col-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0; }
+.count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.iconbtn { font: inherit; line-height: 1; width: 28px; height: 28px; display: inline-grid; place-items: center; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
+.iconbtn:hover { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.col-head .iconbtn { margin-left: auto; font-size: 18px; }
+
+.list { display: flex; flex-direction: column; gap: 8px; padding: 4px 10px 12px; min-height: 96px; }
+.hint { margin: 0; padding: 14px 12px; font-size: 13px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; }
+.drop-line { height: 3px; border-radius: 2px; background: var(--accent); flex: none; margin: -1px 0; }
+
+.card { display: grid; gap: 7px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 10px 8px 12px; cursor: grab; min-width: 0; }
+.card:hover { border-color: var(--muted); }
+.card.dragging { opacity: 0.45; }
+.readonly .card { cursor: pointer; }
+.card h3 { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.notes { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.card-foot { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 24px; }
+.owner { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--muted); }
+.owner b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar { width: 20px; height: 20px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 10px; font-weight: 600; color: #fff; background: hsl(var(--h) 42% 38%); }
+.moves { margin-left: auto; display: inline-flex; gap: 2px; flex: none; }
+.moves .iconbtn { width: 26px; height: 26px; font-size: 15px; }
+.moves .iconbtn[disabled] { opacity: 0.3; cursor: default; pointer-events: none; }
+
+.overlay { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.modal { width: min(540px, 100%); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; display: grid; gap: 14px; }
+.modal h2 { margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: 600; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.field input, .field textarea, .field select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; width: 100%; min-width: 0; }
+.field textarea { min-height: 100px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.form-err { margin: 0; color: var(--danger); font-size: 13px; min-height: 0; }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.grow { flex: 1; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: min(420px, calc(100% - 32px)); background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 8px; font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  h1 { font-size: 26px; }
+  .board { grid-auto-columns: 86%; }
+}
+
+.gate-note { margin: 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="titles">
+      <h1>Team Task Board</h1>
+      <p class="sub" id="summary">Loading tasks</p>
+    </div>
+    <div class="tools">
+      <span class="sync" id="sync" data-state="connecting"><i></i><span>Connecting</span></span>
+      <button type="button" class="btn primary" id="addBtn">New task</button>
+    </div>
+  </header>
+
+  <div class="empty-strip" id="empty" hidden>
+    <p><strong id="emptyTitle"></strong><span id="emptyText"></span></p>
+    <button type="button" class="btn" id="emptyBtn">Add the first task</button>
+  </div>
+
+  <main class="board" id="board" aria-label="Task board"></main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <form class="modal" id="form" role="dialog" aria-modal="true" aria-labelledby="dlgTitle" novalidate>
+    <h2 id="dlgTitle">New task</h2>
+    <div class="field">
+      <label for="fTitle">Task</label>
+      <input id="fTitle" maxlength="140" autocomplete="off" placeholder="What needs to happen?">
+    </div>
+    <div class="field">
+      <label for="fNotes">Notes</label>
+      <textarea id="fNotes" maxlength="1000" placeholder="Links, context, what done looks like"></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fOwner">Owner</label>
+        <input id="fOwner" list="owners" maxlength="40" autocomplete="off" placeholder="Who is on it?">
+        <datalist id="owners"></datalist>
+      </div>
+      <div class="field">
+        <label for="fStatus">Stage</label>
+        <select id="fStatus"></select>
+      </div>
+    </div>
+    <p class="form-err" id="fErr" role="alert"></p>
+    <div class="form-actions">
+      <button type="button" class="btn danger" id="delBtn" hidden>Delete task</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary" id="saveBtn">Save task</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<div class="overlay" id="gate" hidden>
+  <form class="modal" id="gateForm" novalidate>
+    <h2>Team Task Board</h2>
+    <p class="gate-note">Enter the team passcode to open the board.</p>
+    <div class="field">
+      <label for="gatePass">Passcode</label>
+      <input id="gatePass" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+    </div>
+    <p class="form-err" id="gateErr" role="alert"></p>
+    <div class="form-actions">
+      <span class="grow"></span>
+      <button type="submit" class="btn primary" id="gateBtn">Open board</button>
+    </div>
+  </form>
+</div>
+
+<script src="app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "team-task-board",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared team kanban board for Netlify: static page, one Netlify Function, Netlify Blobs storage.",
+  "scripts": {
+    "dev": "netlify dev",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@netlify/blobs": "10.7.13"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
