@@ -60,6 +60,22 @@
   function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
+  // Today in the viewer's own time zone, as YYYY-MM-DD (what a date input uses).
+  function todayLocal() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+  // "2026-03-05" -> "Mar 5" (with the year when it is not this year).
+  function fmtDate(iso) {
+    var p = iso.split("-").map(Number);
+    var d = new Date(p[0], p[1] - 1, p[2]);
+    var opts = { month: "short", day: "numeric" };
+    if (p[0] !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString(undefined, opts);
+  }
+
   function stageIndex(id) { return STAGE_IDS.indexOf(id); }
 
   function toast(msg) {
@@ -142,6 +158,7 @@
         title: typeof v.title === "string" && v.title ? v.title : "Untitled task",
         notes: typeof v.notes === "string" ? v.notes : "",
         owner: typeof v.owner === "string" ? v.owner : "",
+        date: typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : "",
         status: STAGE_IDS.indexOf(v.status) >= 0 ? v.status : "todo",
         order: typeof v.order === "number" ? v.order : 0
       };
@@ -366,6 +383,7 @@
       av.style.setProperty("--h", String(hue(t.owner)));
       foot.append(h("span", { class: "owner" }, av, h("b", { text: t.owner })));
     }
+    if (t.date) foot.append(h("span", { class: "date", text: fmtDate(t.date), title: "Date: " + t.date }));
     var prev = idx > 0 ? STAGES[idx - 1] : null;
     var next = idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
     foot.append(h("span", { class: "moves" },
@@ -466,11 +484,13 @@
     else if (prev) order = prev.order + 1;
     else if (next) order = next.order - 1;
     else order = Date.now();
-    updateTask(id, { status: status, order: order });
+    var patch = { status: status, order: order };
+    if (t.status !== status) patch.date = todayLocal();  // a real move stamps the date
+    updateTask(id, patch);
   }
 
   function step(t, status) {
-    updateTask(t.id, { status: status, order: Date.now() });
+    updateTask(t.id, { status: status, order: Date.now(), date: todayLocal() });
   }
 
   /* ---------- add and edit dialog ---------- */
@@ -489,6 +509,7 @@
     $("#fNotes").value = t ? t.notes : "";
     $("#fOwner").value = t ? t.owner : lsGet("ttb-owner");
     sel.value = t ? t.status : (status || "todo");
+    $("#fDate").value = t ? t.date : "";
     $("#fErr").textContent = "";
     $("#saveBtn").disabled = false;
     resetDelete();
@@ -518,13 +539,18 @@
     var notes = $("#fNotes").value.trim();
     var owner = $("#fOwner").value.trim();
     var status = $("#fStatus").value;
+    var date = $("#fDate").value;
     if (STAGE_IDS.indexOf(status) < 0) status = "todo";
     lsSet("ttb-owner", owner);
 
     if (editingId) {
       var cur = byId[editingId];
-      var patch = { title: title, notes: notes, owner: owner, status: status };
-      if (cur && cur.status !== status) patch.order = Date.now();
+      var patch = { title: title, notes: notes, owner: owner, status: status, date: date };
+      if (cur && cur.status !== status) {
+        patch.order = Date.now();
+        // Moving stage stamps today, unless the date was changed by hand in this dialog.
+        if (date === cur.date) patch.date = todayLocal();
+      }
       var id = editingId;
       closeDialog();
       updateTask(id, patch);
@@ -533,7 +559,7 @@
 
     var btn = $("#saveBtn");
     btn.disabled = true;
-    enqueue(function () { return api("POST", { title: title, notes: notes, owner: owner, status: status }); })
+    enqueue(function () { return api("POST", { title: title, notes: notes, owner: owner, status: status, date: date }); })
       .then(function (d) { settle(d); closeDialog(); }, function (err) { btn.disabled = false; writeError(err); });
   });
 

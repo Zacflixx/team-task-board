@@ -40,7 +40,7 @@ function call(handler, method, body, { passcode = "open-sesame", query = "" } = 
 test("create trims text, defaults to Not started and bumps the revision", () => {
   const { board, task } = applyOp(emptyBoard(), { type: "create", task: { title: "  Ship it  ", owner: " Sam " } }, 1000, () => "a");
   assert.equal(board.rev, 1);
-  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
+  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
 });
 
 test("create rejects an empty title and an unknown stage", () => {
@@ -222,4 +222,25 @@ test("backup retries once after a write conflict and does not leak the token on 
   console.error = original;
   assert.equal(bad.ok, false);
   assert.ok(!JSON.stringify([bad, logged]).includes("ghp_secret"));
+});
+
+test("date is optional, validated, and stamped automatically when a task changes stage", () => {
+  const day = (iso) => Date.parse(iso + "T12:00:00Z");
+  const start = applyOp(emptyBoard(), { type: "create", task: { title: "One", date: "2026-03-01" } }, 1, () => "a").board;
+  assert.equal(start.tasks[0].date, "2026-03-01");
+  assert.equal(applyOp(emptyBoard(), { type: "create", task: { title: "No date" } }, 1, () => "b").task.date, "");
+
+  for (const bad of ["tomorrow", "2026-13-01", "2026-02-30", 5, "2026-3-1"]) {
+    assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { date: bad } }), /Date must look like/, String(bad));
+  }
+
+  // Editing other fields leaves the date alone.
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { title: "Two" } }, day("2026-04-01")).task.date, "2026-03-01");
+  // Same stage again does not stamp.
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { status: "todo" } }, day("2026-04-01")).task.date, "2026-03-01");
+  // A move to another stage stamps the day of the move.
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { status: "progress" } }, day("2026-04-01")).task.date, "2026-04-01");
+  // A date sent together with the move wins, and "" clears it.
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { status: "done", date: "2026-05-05" } }, day("2026-04-01")).task.date, "2026-05-05");
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { date: "" } }).task.date, "");
 });

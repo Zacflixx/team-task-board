@@ -164,6 +164,9 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
   .board { grid-auto-columns: 86%; }
 }
 
+.date { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); background: color-mix(in srgb, var(--stage) 20%, transparent); padding: 1px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
+.date + .moves { margin-left: 4px; }
+.field-note { color: var(--muted); font-size: 12px; }
 .gate-note { margin: 0; color: var(--muted); }
 </style>
 </head>
@@ -209,6 +212,11 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
         <label for="fStatus">Stage</label>
         <select id="fStatus"></select>
       </div>
+    </div>
+    <div class="field">
+      <label for="fDate">Date (optional)</label>
+      <input id="fDate" type="date">
+      <small class="field-note">Set automatically to today whenever the task moves to another stage. You can still change it.</small>
     </div>
     <p class="form-err" id="fErr" role="alert"></p>
     <div class="form-actions">

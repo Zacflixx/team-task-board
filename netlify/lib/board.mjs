@@ -19,6 +19,19 @@ function text(value, max) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
+// Optional calendar date as "YYYY-MM-DD"; "" means no date.
+function optionalDate(value) {
+  if (value === undefined || value === null || value === "") return "";
+  let ok = false;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsed = new Date(value + "T00:00:00Z");
+    // Reject impossible dates: the parse must be valid and round-trip to the same text.
+    ok = !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }
+  if (!ok) throw new HttpError(400, "Date must look like 2026-01-31.");
+  return value;
+}
+
 function requireObject(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new HttpError(400, "Request body must be a JSON object.");
@@ -58,6 +71,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       title,
       notes: text(input.notes, LIMITS.notes),
       owner: text(input.owner, LIMITS.owner),
+      date: optionalDate(input.date),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
       order: now,
       createdAt: now,
@@ -80,6 +94,11 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
     if ("notes" in patch) next.notes = text(patch.notes, LIMITS.notes);
     if ("owner" in patch) next.owner = text(patch.owner, LIMITS.owner);
     if ("status" in patch) next.status = requireStatus(patch.status);
+    if ("date" in patch) next.date = optionalDate(patch.date);
+    // A move to another stage stamps today's date, unless the caller set a date itself.
+    if (next.status !== tasks[index].status && !("date" in patch)) {
+      next.date = new Date(now).toISOString().slice(0, 10);
+    }
     if ("order" in patch) next.order = requireOrder(patch.order);
     next.updatedAt = now;
     tasks[index] = next;
