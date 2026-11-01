@@ -40,7 +40,7 @@ function call(handler, method, body, { passcode = "open-sesame", query = "" } = 
 test("create trims text, defaults to Not started and bumps the revision", () => {
   const { board, task } = applyOp(emptyBoard(), { type: "create", task: { title: "  Ship it  ", owner: " Sam " } }, 1000, () => "a");
   assert.equal(board.rev, 1);
-  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
+  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", images: [], status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
 });
 
 test("create rejects an empty title and an unknown stage", () => {

@@ -11,6 +11,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
 import { applyOp, emptyBoard, HttpError } from "../lib/board.mjs";
 import { backupToGitHub } from "../lib/backup.mjs";
+import { cloudinaryEnabled, uploadPermission, validImageId, deleteImages } from "../lib/cloudinary.mjs";
 
 const STORE_NAME = "team-task-board";
 const KEY = "board";
@@ -49,8 +50,13 @@ async function readJson(req) {
 export function createHandler({
   openStore = () => getStore({ name: STORE_NAME, consistency: "strong" }),
   env = process.env,
-  backup = backupToGitHub
+  backup = backupToGitHub,
+  removeImages = deleteImages
 } = {}) {
+  // Tells the page whether image upload is set up, without storing anything.
+  const withFeatures = (board) => (cloudinaryEnabled(env) ? { ...board, features: { images: true } } : board);
+  const imageIds = (task) => ((task && task.images) || []).map((i) => i.id);
+
   return async function handler(req) {
     try {
       if (!env.TEAM_PASSCODE) {
@@ -62,14 +68,30 @@ export function createHandler({
 
       const store = openStore();
 
+      // /api/images: POST hands out a signed upload permission, DELETE removes an unused image.
+      if (new URL(req.url).pathname.endsWith("/api/images")) {
+        if (!cloudinaryEnabled(env)) return reply(501, { error: "Images are not set up on the server." });
+        if (req.method === "POST") return reply(200, uploadPermission(env));
+        if (req.method === "DELETE") {
+          const { id } = await readJson(req);
+          if (!validImageId(id, env)) throw new HttpError(400, "That image is not valid.");
+          const current = await store.getWithMetadata(KEY, { type: "json" });
+          const used = current && current.data.tasks.some((t) => imageIds(t).includes(id));
+          if (used) throw new HttpError(409, "That image is still used by a task.");
+          await removeImages([id], env);
+          return reply(200, { ok: true });
+        }
+        return reply(405, { error: "Method not allowed." });
+      }
+
       if (req.method === "GET") {
         const current = await store.getWithMetadata(KEY, { type: "json" });
         const board = current ? current.data : emptyBoard();
         const since = Number(new URL(req.url).searchParams.get("rev"));
         if (Number.isFinite(since) && since === board.rev && current) {
-          return reply(200, { rev: board.rev, unchanged: true });
+          return reply(200, withFeatures({ rev: board.rev, unchanged: true }));
         }
-        return reply(200, board);
+        return reply(200, withFeatures(board));
       }
 
       let op;
@@ -86,6 +108,13 @@ export function createHandler({
         return reply(405, { error: "Method not allowed." });
       }
 
+      // Images may only be attached when uploads are set up, and only from our own folder.
+      const wanted = op.type === "create" ? op.task && op.task.images : op.patch && op.patch.images;
+      if (Array.isArray(wanted) && wanted.length) {
+        if (!cloudinaryEnabled(env)) throw new HttpError(400, "Images are not set up on the server.");
+        if (!wanted.every((i) => i && validImageId(i.id, env))) throw new HttpError(400, "That image is not valid.");
+      }
+
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const current = await store.getWithMetadata(KEY, { type: "json" });
         const board = current ? current.data : emptyBoard();
@@ -97,7 +126,12 @@ export function createHandler({
         );
         if (result.modified) {
           await backup(next, env);
-          return reply(200, { ...next, task });
+          // Delete images that this change detached from the task (or the whole deleted task).
+          const before = op.type === "create" ? null : board.tasks.find((t) => t.id === op.id);
+          const kept = op.type === "delete" ? [] : imageIds(task);
+          const removed = imageIds(before).filter((id) => !kept.includes(id));
+          if (removed.length) await removeImages(removed, env);
+          return reply(200, withFeatures({ ...next, task }));
         }
         // Someone else saved first. Read again and re-apply.
       }
@@ -112,4 +146,4 @@ export function createHandler({
 
 export default createHandler();
 
-export const config = { path: "/api/tasks" };
+export const config = { path: ["/api/tasks", "/api/images"] };

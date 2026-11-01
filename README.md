@@ -11,6 +11,7 @@ drag and delete tasks. No separate database service is needed.
 | Page | `public/index.html`, `public/app.js` | The board. Your own changes show immediately and save in the background. It checks for other people's changes every 8 seconds while active, every 30 seconds when idle, and not at all while the tab is hidden. |
 | API | `netlify/functions/tasks.mjs` | One Netlify Function at `/api/tasks`. Checks the passcode, then reads or changes the board. |
 | Storage | Netlify Blobs (built in) | The whole board is one JSON document. Saves use ETag checks, so two people saving at the same moment both land. |
+| Images (optional) | Cloudinary | Attach up to 3 pictures to a task (paste a screenshot, pick a file, or drop one). The page shrinks them, then uploads straight to your Cloudinary account using a short-lived signed permission from the function. The task keeps only the links. |
 | Backup (optional) | `netlify/lib/backup.mjs` | After every saved change, commits the full board to `tasks.json` in a GitHub repo. |
 
 ## Set up
@@ -65,6 +66,21 @@ If GitHub is unreachable the save still succeeds. The next change writes the ful
 
 Tokens expire. Set a reminder to renew yours.
 
+### 4. Turn on image attachments (optional)
+
+Uses your existing Cloudinary account. Images are stored there, not in the board.
+
+| Variable | Value |
+| --- | --- |
+| `CLOUDINARY_CLOUD_NAME` | Your cloud name (Cloudinary dashboard) |
+| `CLOUDINARY_API_KEY` | Your API key |
+| `CLOUDINARY_API_SECRET` | Your API secret. Keep it only in Netlify's settings. |
+| `CLOUDINARY_FOLDER` | Optional. Defaults to `team-task-board` |
+
+Redeploy. The task dialog now shows an "Images" section. Without these variables the board works as before and the section is hidden.
+
+Good to know: image links are public (long random names, no passcode). Uploads need the team passcode. Deleting a task or removing an image deletes it from Cloudinary. The GitHub backup keeps the image links, not the files.
+
 ## Run it on your computer
 
 ```bash
@@ -86,6 +102,7 @@ npm test                  # unit tests for the board logic and the API handler
 - **Updates are not instant for other people.** Your own moves show at once. A teammate sees them within about 8 seconds.
 - **Limits.** Up to 5,000 tasks; titles 140 characters, notes 1,000, owner 40.
 - **Netlify usage.** Every check is one function call, and Netlify bills from a monthly credit pool. Idle and hidden tabs slow down or stop on their own. Look at Netlify's usage page after the first week and adjust `POLL_MS` and `IDLE_POLL_MS` at the top of `public/app.js` if needed.
+- **Images** are limited to 3 per task and are shrunk to 1600 px before upload. Animated GIFs become still images.
 - **Restoring.** If the board is ever wiped, `tasks.json` in the backup repo holds the tasks. Each task has `title`, `notes`, `owner`, `status` and `order`.
 
 ## Files

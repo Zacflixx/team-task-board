@@ -10,6 +10,7 @@ Almost done, Done, Live. Everyone with the team passcode can add, edit, drag and
 - Storage: Netlify Blobs, store `team-task-board`, key `board`, strong consistency. The whole board is one JSON document `{ rev, tasks: [...] }`. Writes read the document, apply one operation, and save with `onlyIfMatch: etag` (or `onlyIfNew`), retrying on conflict.
 - `netlify/lib/board.mjs`: pure validation and operations. No I/O. Keep it that way so it stays easy to test.
 - `netlify/lib/backup.mjs`: optional commit of the full board to `tasks.json` in a separate GitHub repo after every successful save. Failures are logged and never fail a save.
+- `netlify/lib/cloudinary.mjs`: optional image attachments. The browser asks `/api/images` (same function) for a signed upload permission, then uploads straight to Cloudinary; a task stores only `images: [{ id, url }]` (max 3). Images are public links. Removing an image or deleting a task deletes it from Cloudinary (best effort). Switched off unless all three `CLOUDINARY_*` variables are set.
 - `docs/claude-artifact-version.html`: the earlier single-file version that ran inside Claude. Reference only. Do not ship it.
 
 Front end behavior to preserve:
@@ -27,13 +28,13 @@ npx netlify-cli dev         # local site and function; needs TEAM_PASSCODE in .e
 
 ## Environment variables (set in Netlify, never committed)
 
-`TEAM_PASSCODE` (required). Optional backup: `GITHUB_TOKEN`, `BACKUP_GITHUB_REPO`,
+`TEAM_PASSCODE` (required). Optional images: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER`. Optional backup: `GITHUB_TOKEN`, `BACKUP_GITHUB_REPO`,
 `BACKUP_GITHUB_BRANCH`, `BACKUP_GITHUB_PATH`.
 
 ## Rules for working here
 
-- No external database or paid service. Storage stays in Netlify Blobs.
-- Never commit `.env`, tokens or the passcode. Never log the passcode.
+- No external database. Board data stays in Netlify Blobs. The one exception is image files, which live on the team's existing Cloudinary account. Never put image data in the board document.
+- Never commit `.env`, tokens or the passcode. Never log the passcode or the Cloudinary secret; the secret never goes to the browser.
 - The backup repo must stay separate from the deployed repo, or every save triggers a site build.
 - Render all user text with `textContent` (the `h()` helper does this). Do not use `innerHTML` for task data.
 - Keep dependencies minimal. The only runtime dependency is `@netlify/blobs`.

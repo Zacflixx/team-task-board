@@ -2,7 +2,7 @@
 // No network and no storage here, so it can be unit tested on its own.
 
 export const STATUSES = ["todo", "progress", "almost", "done", "live"];
-export const LIMITS = { title: 140, notes: 1000, owner: 40, tasks: 5000 };
+export const LIMITS = { title: 140, notes: 1000, owner: 40, tasks: 5000, images: 3 };
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -30,6 +30,25 @@ function optionalDate(value) {
   }
   if (!ok) throw new HttpError(400, "Date must look like 2026-01-31.");
   return value;
+}
+
+// Images are stored on Cloudinary; a task keeps only [{ id, url }]. Only Cloudinary links are accepted.
+function optionalImages(value) {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new HttpError(400, "Images must be a list.");
+  if (value.length > LIMITS.images) throw new HttpError(400, `Up to ${LIMITS.images} images per task.`);
+  const seen = new Set();
+  return value.map((item) => {
+    const ok =
+      item && typeof item.id === "string" && typeof item.url === "string" &&
+      /^[A-Za-z0-9_\-/]{1,200}$/.test(item.id) &&
+      /^https:\/\/res\.cloudinary\.com\/\S{1,450}$/.test(item.url) &&
+      item.url.includes(item.id);
+    if (!ok) throw new HttpError(400, "That image is not valid.");
+    if (seen.has(item.id)) throw new HttpError(400, "The same image was added twice.");
+    seen.add(item.id);
+    return { id: item.id, url: item.url };
+  });
 }
 
 function requireObject(value) {
@@ -72,6 +91,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       notes: text(input.notes, LIMITS.notes),
       owner: text(input.owner, LIMITS.owner),
       date: optionalDate(input.date),
+      images: optionalImages(input.images),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
       order: now,
       createdAt: now,
@@ -95,6 +115,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
     if ("owner" in patch) next.owner = text(patch.owner, LIMITS.owner);
     if ("status" in patch) next.status = requireStatus(patch.status);
     if ("date" in patch) next.date = optionalDate(patch.date);
+    if ("images" in patch) next.images = optionalImages(patch.images);
     // A move to another stage stamps today's date, unless the caller set a date itself.
     if (next.status !== tasks[index].status && !("date" in patch)) {
       next.date = new Date(now).toISOString().slice(0, 10);

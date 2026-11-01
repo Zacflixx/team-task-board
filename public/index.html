@@ -167,7 +167,35 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .date { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); background: color-mix(in srgb, var(--stage) 20%, transparent); padding: 1px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
 .date + .moves { margin-left: 4px; }
 .field-note { color: var(--muted); font-size: 12px; }
+.thumbs { display: flex; gap: 6px; }
+.thumb { flex: 1 1 0; min-width: 0; height: 64px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
+.thumb:hover { border-color: var(--stage); }
+.thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.img-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.img-grid:empty { display: none; }
+.img-item { position: relative; aspect-ratio: 3 / 2; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.img-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-up { display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.img-x { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(20, 14, 52, 0.75); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.img-x:hover { background: var(--danger); }
+.lightbox { z-index: 40; background: rgba(10, 8, 28, 0.86); grid-auto-flow: column; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; }
+.lb-figure { margin: 0; min-width: 0; display: grid; justify-items: center; gap: 8px; }
+.lb-figure img { max-width: 100%; max-height: 82vh; border-radius: 10px; background: var(--surface); }
+.lb-figure figcaption { color: #fff; font-family: var(--font-mono); font-size: 12px; min-height: 1em; }
+.lb-close { position: fixed; top: 14px; right: 14px; font-size: 20px; line-height: 1; padding: 6px 12px; }
+@media (max-width: 640px) { .lightbox { grid-template-columns: 1fr; } #lbPrev, #lbNext { display: none; } }
 .gate-note { margin: 0; color: var(--muted); }
+
+/* Cards are tinted by stage so they stand out from the column behind them. */
+:root:not([data-theme="dark"]) {
+  --muted: #4d4a78;
+  --shadow: 0 1px 2px rgba(40, 28, 110, 0.14), 0 5px 16px rgba(40, 28, 110, 0.12);
+  --shadow-lift: 0 3px 6px rgba(40, 28, 110, 0.18), 0 12px 28px rgba(40, 28, 110, 0.2);
+}
+:root:not([data-theme="dark"]) .card { background: color-mix(in srgb, var(--stage) 18%, #ffffff); border-color: color-mix(in srgb, var(--stage) 45%, var(--line)); border-left-width: 5px; }
+:root:not([data-theme="dark"]) .iconbtn:hover { background: #ffffff; }
 </style>
 </head>
 <body>
@@ -218,6 +246,15 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
       <input id="fDate" type="date">
       <small class="field-note">Set automatically to today whenever the task moves to another stage. You can still change it.</small>
     </div>
+    <div class="field" id="imgField" hidden>
+      <label>Images (optional)</label>
+      <div class="img-grid" id="imgGrid"></div>
+      <div class="img-actions">
+        <button type="button" class="btn" id="imgBtn">Add image</button>
+        <input type="file" id="imgFile" accept="image/*" multiple hidden>
+        <small class="field-note">Or paste a screenshot with Ctrl+V. Up to 3. Images are shrunk before upload.</small>
+      </div>
+    </div>
     <p class="form-err" id="fErr" role="alert"></p>
     <div class="form-actions">
       <button type="button" class="btn danger" id="delBtn" hidden>Delete task</button>
@@ -226,6 +263,16 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
       <button type="submit" class="btn primary" id="saveBtn">Save task</button>
     </div>
   </form>
+</div>
+
+<div class="overlay lightbox" id="lightbox" hidden>
+  <button type="button" class="btn" id="lbPrev" aria-label="Previous image">&lsaquo;</button>
+  <figure class="lb-figure">
+    <img id="lbImg" alt="Task image">
+    <figcaption id="lbCount"></figcaption>
+  </figure>
+  <button type="button" class="btn" id="lbNext" aria-label="Next image">&rsaquo;</button>
+  <button type="button" class="btn lb-close" id="lbClose" aria-label="Close image">&times;</button>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
