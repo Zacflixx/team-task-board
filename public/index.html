@@ -169,6 +169,12 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .date.due { background: transparent; border: 1px solid color-mix(in srgb, var(--stage) 55%, var(--line)); }
 .date.overdue { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: var(--danger); font-weight: 500; }
 .date.relaxed { color: var(--s-done); border-color: color-mix(in srgb, var(--s-done) 55%, var(--line)); }
+.link-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.link-chip { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--accent); text-decoration: none; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: 999px; padding: 2px 11px; }
+.link-chip::after { content: " \2197"; }
+.link-chip:hover { text-decoration: underline; border-color: var(--accent); }
+.link-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.link-list.small .link-chip { font-size: 12px; padding: 1px 9px; }
 .dates-note { margin-top: -6px; }
 .field-note { color: var(--muted); font-size: 12px; }
 .thumbs { display: flex; gap: 6px; }
@@ -237,6 +243,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
     <div class="field">
       <label for="fNotes">Notes</label>
       <textarea id="fNotes" maxlength="1000" placeholder="Links, context, what done looks like"></textarea>
+      <div class="link-list" id="linkList" hidden aria-label="Links found in this task"></div>
     </div>
     <div class="row2">
       <div class="field">

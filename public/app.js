@@ -106,6 +106,46 @@
     return d.toLocaleDateString(undefined, opts);
   }
 
+  /* ---------- links found in task text ---------- */
+
+  var MAX_LINKS = 5;
+
+  // Find http(s) links (and bare www. ones) in some text. Only http and https are ever returned.
+  function findLinks(text) {
+    var found = [];
+    var seen = {};
+    (String(text).match(/\b(?:https?:\/\/|www\.)[^\s<>"']+/gi) || []).forEach(function (raw) {
+      var s = raw;
+      for (;;) {
+        var last = s.charAt(s.length - 1);
+        if (/[.,;:!?'"]/.test(last)) { s = s.slice(0, -1); continue; }
+        // A closing bracket belongs to the link only if it has a matching opening one.
+        var pairs = { ")": "(", "]": "[", "}": "{" };
+        if (pairs[last] && s.split(last).length > s.split(pairs[last]).length) { s = s.slice(0, -1); continue; }
+        break;
+      }
+      var u;
+      try { u = new URL(/^www\./i.test(s) ? "https://" + s : s); } catch (e) { return; }
+      if (u.protocol !== "https:" && u.protocol !== "http:") return;
+      if (seen[u.href] || found.length >= MAX_LINKS) return;
+      seen[u.href] = 1;
+      var path = u.pathname === "/" && !u.search ? "" : u.pathname + u.search;
+      if (path.length > 28) path = path.slice(0, 27) + "…";
+      found.push({ href: u.href, label: u.host.replace(/^www\./, "") + path });
+    });
+    return found;
+  }
+
+  // A clickable chip. The text is set with textContent and the link opens in a new tab.
+  function linkEl(link, extra) {
+    return h("a", {
+      class: "link-chip" + (extra ? " " + extra : ""),
+      href: link.href, target: "_blank", rel: "noopener noreferrer nofollow",
+      title: link.href, text: link.label, draggable: "false",
+      onclick: function (e) { e.stopPropagation(); }
+    });
+  }
+
   function stageIndex(id) { return STAGE_IDS.indexOf(id); }
 
   function toast(msg) {
@@ -424,6 +464,12 @@
     });
     card.append(h("h3", { text: t.title }));
     if (t.notes) card.append(h("p", { class: "notes", text: t.notes }));
+    var cardLinks = findLinks(t.title + "\n" + t.notes);
+    if (cardLinks.length) {
+      var linkRow = h("div", { class: "link-list small" });
+      cardLinks.forEach(function (l) { linkRow.append(linkEl(l)); });
+      card.append(linkRow);
+    }
     if (t.images.length) {
       var thumbs = h("div", { class: "thumbs" });
       t.images.forEach(function (im, n) {
@@ -697,6 +743,17 @@
 
   /* ---------- add and edit dialog ---------- */
 
+  // Show the links found in the title and notes right under the notes box, updating as you type.
+  function renderLinks() {
+    var box = $("#linkList");
+    box.replaceChildren();
+    var links = findLinks($("#fTitle").value + "\n" + $("#fNotes").value);
+    links.forEach(function (l) { box.append(linkEl(l)); });
+    box.hidden = links.length === 0;
+  }
+  $("#fNotes").addEventListener("input", renderLinks);
+  $("#fTitle").addEventListener("input", renderLinks);
+
   var dlgDeadline = "";  // the deadline the task had when the dialog opened
 
   function fillDeadlineSelect(current) {
@@ -736,6 +793,7 @@
     sel.value = t ? t.status : (status || "todo");
     $("#fDate").value = t ? t.date : "";
     fillDeadlineSelect(t ? t.deadline : "");
+    renderLinks();
     dlgImages = t ? t.images.slice() : [];
     dlgOriginal = dlgImages.map(function (i) { return i.id; });
     uploading = 0;
