@@ -17,6 +17,7 @@
   var POLL_MS = 8000;        // how often to check while the board is active
   var IDLE_POLL_MS = 30000;  // how often once nothing has changed for two minutes
   var ACTIVE_WINDOW_MS = 120000;
+  var DEFAULT_OWNERS = ["Isaac", "Kevin", "Maryam", "Soumya"];  // always offered in the Owner field
   var $ = function (s) { return document.querySelector(s); };
 
   var tasks = [];
@@ -335,8 +336,21 @@
     var seen = {};
     var dl = $("#owners");
     dl.replaceChildren();
-    tasks.forEach(function (t) {
-      if (t.owner && !seen[t.owner]) { seen[t.owner] = 1; dl.append(h("option", { value: t.owner })); }
+    // The default team members first, then any other name already used on the board.
+    DEFAULT_OWNERS.concat(tasks.map(function (t) { return t.owner; })).forEach(function (name) {
+      var key = name.toLowerCase();
+      if (name && !seen[key]) { seen[key] = 1; dl.append(h("option", { value: name })); }
+    });
+  }
+
+  // One-click owner names under the Owner field.
+  function buildOwnerChips() {
+    var box = $("#ownerChips");
+    DEFAULT_OWNERS.forEach(function (name) {
+      box.append(h("button", {
+        type: "button", class: "chip", text: name,
+        onclick: function () { $("#fOwner").value = name; $("#fOwner").focus(); }
+      }));
     });
   }
 
@@ -761,6 +775,7 @@
 
   /* ---------- start ---------- */
 
+  buildOwnerChips();
   render();
   if (passcode) {
     setSync("connecting");
