@@ -40,7 +40,7 @@ function call(handler, method, body, { passcode = "open-sesame", query = "" } = 
 test("create trims text, defaults to Not started and bumps the revision", () => {
   const { board, task } = applyOp(emptyBoard(), { type: "create", task: { title: "  Ship it  ", owner: " Sam " } }, 1000, () => "a");
   assert.equal(board.rev, 1);
-  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", images: [], status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
+  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", deadline: "", images: [], status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
 });
 
 test("create rejects an empty title and an unknown stage", () => {
@@ -243,4 +243,23 @@ test("date is optional, validated, and stamped automatically when a task changes
   // A date sent together with the move wins, and "" clears it.
   assert.equal(applyOp(start, { type: "update", id: "a", patch: { status: "done", date: "2026-05-05" } }, day("2026-04-01")).task.date, "2026-05-05");
   assert.equal(applyOp(start, { type: "update", id: "a", patch: { date: "" } }).task.date, "");
+});
+
+test("deadline is optional, validated, and never changed by moving a task", () => {
+  const start = applyOp(emptyBoard(), { type: "create", task: { title: "One", deadline: "2026-06-30" } }, 1, () => "a").board;
+  assert.equal(start.tasks[0].deadline, "2026-06-30");
+  assert.equal(applyOp(emptyBoard(), { type: "create", task: { title: "No deadline" } }, 1, () => "b").task.deadline, "");
+
+  for (const bad of ["soon", "2026-02-30", "2026-13-01", 7]) {
+    assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { deadline: bad } }), /Date must look like/, String(bad));
+  }
+
+  // A move stamps the date but leaves the deadline alone.
+  const moved = applyOp(start, { type: "update", id: "a", patch: { status: "done" } }, Date.parse("2026-04-01T12:00:00Z")).task;
+  assert.equal(moved.date, "2026-04-01");
+  assert.equal(moved.deadline, "2026-06-30");
+
+  // It can be changed or cleared by hand.
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { deadline: "2026-07-15" } }).task.deadline, "2026-07-15");
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { deadline: "" } }).task.deadline, "");
 });

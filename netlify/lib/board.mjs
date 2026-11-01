@@ -91,6 +91,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       notes: text(input.notes, LIMITS.notes),
       owner: text(input.owner, LIMITS.owner),
       date: optionalDate(input.date),
+      deadline: optionalDate(input.deadline),
       images: optionalImages(input.images),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
       order: now,
@@ -115,6 +116,8 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
     if ("owner" in patch) next.owner = text(patch.owner, LIMITS.owner);
     if ("status" in patch) next.status = requireStatus(patch.status);
     if ("date" in patch) next.date = optionalDate(patch.date);
+    // The deadline is only ever changed by hand; moving a task never touches it.
+    if ("deadline" in patch) next.deadline = optionalDate(patch.deadline);
     if ("images" in patch) next.images = optionalImages(patch.images);
     // A move to another stage stamps today's date, unless the caller set a date itself.
     if (next.status !== tasks[index].status && !("date" in patch)) {

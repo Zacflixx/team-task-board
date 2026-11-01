@@ -167,6 +167,7 @@
         notes: typeof v.notes === "string" ? v.notes : "",
         owner: typeof v.owner === "string" ? v.owner : "",
         date: typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : "",
+        deadline: typeof v.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.deadline) ? v.deadline : "",
         images: (Array.isArray(v.images) ? v.images : []).filter(function (i) {
           return i && typeof i.id === "string" && typeof i.url === "string" && i.url.indexOf("https://res.cloudinary.com/") === 0;
         }).slice(0, MAX_IMAGES).map(function (i) { return { id: i.id, url: i.url }; }),
@@ -418,7 +419,20 @@
       av.style.setProperty("--h", String(hue(t.owner)));
       foot.append(h("span", { class: "owner" }, av, h("b", { text: t.owner })));
     }
-    if (t.date) foot.append(h("span", { class: "date", text: fmtDate(t.date), title: "Date: " + t.date }));
+    if (t.deadline || t.date) {
+      var dates = h("span", { class: "dates" });
+      if (t.deadline) {
+        // Past its deadline and not finished: say so in words as well as colour.
+        var late = t.deadline < todayLocal() && t.status !== "done" && t.status !== "live";
+        dates.append(h("span", {
+          class: "date due" + (late ? " overdue" : ""),
+          text: (late ? "Overdue " : "Due ") + fmtDate(t.deadline),
+          title: "Deadline: " + t.deadline
+        }));
+      }
+      if (t.date) dates.append(h("span", { class: "date", text: fmtDate(t.date), title: "Date: " + t.date }));
+      card.append(dates);  // its own row above the owner line, so names are not squeezed
+    }
     var prev = idx > 0 ? STAGES[idx - 1] : null;
     var next = idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
     foot.append(h("span", { class: "moves" },
@@ -674,6 +688,7 @@
     $("#fOwner").value = t ? t.owner : lsGet("ttb-owner");
     sel.value = t ? t.status : (status || "todo");
     $("#fDate").value = t ? t.date : "";
+    $("#fDeadline").value = t ? t.deadline : "";
     dlgImages = t ? t.images.slice() : [];
     dlgOriginal = dlgImages.map(function (i) { return i.id; });
     uploading = 0;
@@ -719,7 +734,7 @@
 
     if (editingId) {
       var cur = byId[editingId];
-      var patch = { title: title, notes: notes, owner: owner, status: status, date: date };
+      var patch = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: $("#fDeadline").value };
       if (imagesEnabled) patch.images = dlgImages;
       if (cur && cur.status !== status) {
         patch.order = Date.now();
@@ -734,7 +749,7 @@
 
     var btn = $("#saveBtn");
     btn.disabled = true;
-    var body = { title: title, notes: notes, owner: owner, status: status, date: date };
+    var body = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: $("#fDeadline").value };
     if (imagesEnabled) body.images = dlgImages;
     enqueue(function () { return api("POST", body); })
       .then(function (d) { settle(d); closeDialog(true); }, function (err) { btn.disabled = false; writeError(err); });

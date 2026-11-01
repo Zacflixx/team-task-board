@@ -152,7 +152,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .field label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .field input, .field textarea, .field select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; width: 100%; min-width: 0; }
 .field textarea { min-height: 100px; resize: vertical; }
-.row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.row2 { display: grid; align-items: start; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .form-err { margin: 0; color: var(--danger); font-size: 13px; min-height: 0; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .grow { flex: 1; }
@@ -164,8 +164,11 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
   .board { grid-auto-columns: 86%; }
 }
 
-.date { margin-left: auto; font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); background: color-mix(in srgb, var(--stage) 20%, transparent); padding: 1px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
-.date + .moves { margin-left: 4px; }
+.dates { display: flex; flex-wrap: wrap; gap: 6px; }
+.date { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); background: color-mix(in srgb, var(--stage) 20%, transparent); padding: 1px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
+.date.due { background: transparent; border: 1px solid color-mix(in srgb, var(--stage) 55%, var(--line)); }
+.date.overdue { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: var(--danger); font-weight: 500; }
+.dates-note { margin-top: -6px; }
 .field-note { color: var(--muted); font-size: 12px; }
 .thumbs { display: flex; gap: 6px; }
 .thumb { flex: 1 1 0; min-width: 0; height: 64px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
@@ -246,11 +249,17 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
         <select id="fStatus"></select>
       </div>
     </div>
-    <div class="field">
-      <label for="fDate">Date (optional)</label>
-      <input id="fDate" type="date">
-      <small class="field-note">Set automatically to today whenever the task moves to another stage. You can still change it.</small>
+    <div class="row2">
+      <div class="field">
+        <label for="fDate">Date (optional)</label>
+        <input id="fDate" type="date">
+      </div>
+      <div class="field">
+        <label for="fDeadline">Deadline (optional)</label>
+        <input id="fDeadline" type="date">
+      </div>
     </div>
+    <small class="field-note dates-note">Date is set to today automatically whenever the task moves to another stage (you can still change it). Deadline only changes when you change it.</small>
     <div class="field" id="imgField" hidden>
       <label>Images (optional)</label>
       <div class="img-grid" id="imgGrid"></div>
