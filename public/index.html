@@ -34,6 +34,7 @@ img { max-width: 100%; }
   --s-almost: #f08c00;
   --s-done: #12a05c;
   --s-live: #a23fe8;
+  --s-archive: #7c8aa5;
   --font-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
   --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -58,6 +59,7 @@ img { max-width: 100%; }
   --s-almost: #ffb13b;
   --s-done: #39d98a;
   --s-live: #c58bff;
+  --s-archive: #9aa7c4;
   color-scheme: dark;
 }
 
@@ -130,19 +132,19 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .hint { margin: 0; padding: 14px 12px; font-size: 13px; color: var(--muted); border: 1px dashed color-mix(in srgb, var(--stage) 45%, var(--line)); border-radius: 10px; }
 .drop-line { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); flex: none; margin: -1px 0; }
 
-.card { display: grid; gap: 7px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--stage); border-radius: 10px; padding: 10px 10px 8px 12px; cursor: grab; min-width: 0; box-shadow: var(--shadow); transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
+.card { position: relative; display: grid; gap: 7px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--stage); border-radius: 10px; padding: 10px 10px 8px 12px; cursor: grab; min-width: 0; box-shadow: var(--shadow); transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
 .card:hover { border-color: color-mix(in srgb, var(--stage) 55%, var(--line)); box-shadow: var(--shadow-lift); transform: translateY(-2px); }
 @media (prefers-reduced-motion: reduce) { .card, .btn { transition: none; } .card:hover, .btn.primary:hover { transform: none; } }
 .card.dragging { opacity: 0.45; }
 .readonly .card { cursor: pointer; }
-.card h3 { margin: 0; font-size: 14.5px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.card h3 { margin: 0; padding-right: 30px; font-size: 14.5px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .notes { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-.card-foot { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 24px; }
+.card-foot { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 32px; }
 .owner { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--muted); }
 .owner b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { width: 20px; height: 20px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 10px; font-weight: 600; color: #fff; background: linear-gradient(135deg, hsl(var(--h) 68% 46%), hsl(calc(var(--h) + 40) 70% 38%)); }
 .moves { margin-left: auto; display: inline-flex; gap: 2px; flex: none; }
-.moves .iconbtn { width: 26px; height: 26px; font-size: 15px; }
+.moves .iconbtn { width: 32px; height: 32px; font-size: 21px; }
 .moves .iconbtn[disabled] { opacity: 0.3; cursor: default; pointer-events: none; }
 
 .overlay { position: fixed; inset: 0; z-index: 20; background: var(--scrim); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
@@ -175,6 +177,26 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .link-chip:hover { text-decoration: underline; border-color: var(--accent); }
 .link-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .link-list.small .link-chip { font-size: 12px; padding: 1px 9px; }
+.dup { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; font-size: 15px; }
+.thumb.more { background: #1b1740; border-color: #1b1740; color: #fff; font-size: 17px; font-weight: 600; cursor: pointer; display: grid; place-items: center; }
+.thumb.more:hover { background: #2c2663; border-color: var(--stage); }
+.board.archive-collapsed { grid-template-columns: repeat(5, minmax(250px, 1fr)) 64px; }
+@media (max-width: 640px) { .board.archive-collapsed { grid-template-columns: repeat(5, 86%) 64px; } }
+.col.collapsed { background: color-mix(in srgb, var(--stage) 10%, var(--surface-2)); }
+.col-open { width: 100%; min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px; padding: 14px 0; font: inherit; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; }
+.col-open:hover { background: color-mix(in srgb, var(--stage) 14%, transparent); }
+.col-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vname { writing-mode: vertical-rl; font-family: var(--font-display); font-weight: 600; font-size: 16px; letter-spacing: 0.04em; }
+.sel-box { position: absolute; top: 12px; left: 11px; width: 18px; height: 18px; border: 2px solid var(--muted); border-radius: 5px; background: var(--surface); }
+.card.selected .sel-box { background: var(--accent); border-color: var(--accent); }
+.card.selected .sel-box::after { content: "\2713"; display: block; text-align: center; color: var(--accent-ink); font-size: 12px; line-height: 14px; font-weight: 700; }
+.selecting .card { cursor: pointer; padding-left: 38px; }
+.selecting .card.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.selecting .card .dup, .selecting .card .moves { display: none; }
+body.selecting { padding-bottom: 100px; }
+.selbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 15; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; max-width: calc(100% - 24px); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow-lift); }
+.selbar select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+#selCount { font-family: var(--font-mono); font-size: 13px; min-width: 88px; }
 .dates-note { margin-top: -6px; }
 .field-note { color: var(--muted); font-size: 12px; }
 .thumbs { display: flex; gap: 6px; }
@@ -220,6 +242,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
       <p class="sub" id="summary">Loading tasks</p>
     </div>
     <div class="tools">
+      <button type="button" class="btn" id="selectBtn" aria-pressed="false">Select</button>
       <span class="sync" id="sync" data-state="connecting"><i></i><span>Connecting</span></span>
       <button type="button" class="btn primary" id="addBtn">New task</button>
     </div>
@@ -274,7 +297,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
       <div class="img-actions">
         <button type="button" class="btn" id="imgBtn">Add image</button>
         <input type="file" id="imgFile" accept="image/*" multiple hidden>
-        <small class="field-note">Or paste a screenshot with Ctrl+V. Up to 3. Images are shrunk before upload.</small>
+        <small class="field-note">Or paste a screenshot with Ctrl+V. Up to 6. Images are shrunk before upload.</small>
       </div>
     </div>
     <p class="form-err" id="fErr" role="alert"></p>
@@ -295,6 +318,13 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
   </figure>
   <button type="button" class="btn" id="lbNext" aria-label="Next image">&rsaquo;</button>
   <button type="button" class="btn lb-close" id="lbClose" aria-label="Close image">&times;</button>
+</div>
+
+<div class="selbar" id="selBar" hidden role="region" aria-label="Move selected cards">
+  <span id="selCount">0 selected</span>
+  <select id="selStage" aria-label="Move selected cards to"></select>
+  <button type="button" class="btn primary" id="selMove" disabled>Move</button>
+  <button type="button" class="btn" id="selCancel">Cancel</button>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>

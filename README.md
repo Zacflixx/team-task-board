@@ -1,7 +1,7 @@
 # Team Task Board
 
 A shared kanban board for a small team. Cards move through five stages:
-**Not started, In progress, Almost done, Approval, Live.** Anyone with the team passcode can add, edit,
+**Not started, In progress, Almost done, Approval, Live,** plus a collapsed **Archive** for older finished work. Anyone with the team passcode can add, edit,
 drag and delete tasks. No separate database service is needed.
 
 ## How it works
@@ -11,7 +11,7 @@ drag and delete tasks. No separate database service is needed.
 | Page | `public/index.html`, `public/app.js` | The board. Your own changes show immediately and save in the background. It checks for other people's changes every 8 seconds while active, every 30 seconds when idle, and not at all while the tab is hidden. |
 | API | `netlify/functions/tasks.mjs` | One Netlify Function at `/api/tasks`. Checks the passcode, then reads or changes the board. |
 | Storage | Netlify Blobs (built in) | The whole board is one JSON document. Saves use ETag checks, so two people saving at the same moment both land. |
-| Images (optional) | Cloudinary | Attach up to 3 pictures to a task (paste a screenshot, pick a file, or drop one). The page shrinks them, then uploads straight to your Cloudinary account using a short-lived signed permission from the function. The task keeps only the links. |
+| Images (optional) | Cloudinary | Attach up to 6 pictures to a task (paste a screenshot, pick a file, or drop one). The page shrinks them, then uploads straight to your Cloudinary account using a short-lived signed permission from the function. The task keeps only the links. |
 | Backup (optional) | `netlify/lib/backup.mjs` | After every saved change, commits the full board to `tasks.json` in a GitHub repo. |
 
 ## Set up
@@ -98,11 +98,12 @@ npm test                  # unit tests for the board logic and the API handler
 ## Good to know
 
 - **One shared passcode, no personal accounts.** Anyone who has it can change anything. Use a long one, and change it when someone leaves the team.
+- **Archive, Select and Duplicate.** The Archive column starts collapsed (click the strip at the right edge to open it; each person's choice is remembered). "Select" next to the sync indicator lets you tick several cards and move them together. The copy icon on a card duplicates it; the copy shares the original's pictures, which are only deleted from Cloudinary when no task uses them.
 - **Owner is free text.** It is a name typed on the card, not a login.
 - **Updates are not instant for other people.** Your own moves show at once. A teammate sees them within about 8 seconds.
 - **Limits.** Up to 5,000 tasks; titles 140 characters, notes 1,000, owner 40.
 - **Netlify usage.** Every check is one function call, and Netlify bills from a monthly credit pool. Idle and hidden tabs slow down or stop on their own. Look at Netlify's usage page after the first week and adjust `POLL_MS` and `IDLE_POLL_MS` at the top of `public/app.js` if needed.
-- **Images** are limited to 3 per task and are shrunk to 1600 px before upload. Animated GIFs become still images.
+- **Images** are limited to 6 per task and are shrunk to 1600 px before upload. Animated GIFs become still images.
 - **Restoring.** If the board is ever wiped, `tasks.json` in the backup repo holds the tasks. Each task has `title`, `notes`, `owner`, `status` and `order`.
 
 ## Files

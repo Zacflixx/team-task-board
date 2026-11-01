@@ -280,3 +280,11 @@ test("a new task may ask for a position, and rejects a bad one", () => {
   assert.equal(applyOp(emptyBoard(), { type: "create", task: { title: "Normal" } }, 1000, () => "b").task.order, 1000);
   assert.throws(() => applyOp(emptyBoard(), { type: "create", task: { title: "Bad", order: "first" } }), /Order must be a number/);
 });
+
+test("Archive is a valid stage and archiving keeps the task, stamping the date", () => {
+  const start = applyOp(emptyBoard(), { type: "create", task: { title: "Old one", status: "live" } }, 1, () => "a").board;
+  const { task } = applyOp(start, { type: "update", id: "a", patch: { status: "archive" } }, Date.parse("2026-06-01T12:00:00Z"));
+  assert.equal(task.status, "archive");
+  assert.equal(task.date, "2026-06-01");
+  assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { status: "archived" } }), /Unknown stage/);
+});

@@ -11,7 +11,8 @@
     { id: "progress", name: "In progress", color: "--s-prog" },
     { id: "almost", name: "Almost done", color: "--s-almost" },
     { id: "done", name: "Approval", color: "--s-done" },
-    { id: "live", name: "Live", color: "--s-live" }
+    { id: "live", name: "Live", color: "--s-live" },
+    { id: "archive", name: "Archive", color: "--s-archive" }  // older finished work; collapsed by default
   ];
   var STAGE_IDS = STAGES.map(function (s) { return s.id; });
   var POLL_MS = 8000;        // how often to check while the board is active
@@ -38,12 +39,15 @@
   var toastTimer = null;
   var delTimer = null;
   var imagesEnabled = false;  // the server says whether Cloudinary is set up
-  var MAX_IMAGES = 3;
+  var MAX_IMAGES = 6;
   var dlgImages = [];         // images attached in the open dialog: [{ id, url }]
   var dlgOriginal = [];       // ids that were already saved on the task when the dialog opened
   var uploading = 0;
   var lbList = [];
   var lbIndex = 0;
+  var archiveOpen = lsGet("ttb-archive-open") === "1";  // the Archive column starts collapsed
+  var selecting = false;  // multi-select mode
+  var selected = {};      // ids ticked in multi-select mode
 
   function h(tag, attrs) {
     var el = document.createElement(tag);
@@ -361,12 +365,13 @@
 
   function renderSummary() {
     var total = tasks.length;
-    var open = tasks.filter(function (t) { return t.status !== "done" && t.status !== "live"; }).length;
+    var open = tasks.filter(function (t) { return t.status !== "done" && t.status !== "live" && t.status !== "archive"; }).length;
+    var archived = tasks.filter(function (t) { return t.status === "archive"; }).length;
     var done = tasks.filter(function (t) { return t.status === "done"; }).length;
     var live = tasks.filter(function (t) { return t.status === "live"; }).length;
     var text;
     if (!total) text = loaded ? "Nothing tracked yet" : (locked ? "Locked" : (offline ? "Can't reach the board" : "Loading tasks"));
-    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + done + " in approval · " + live + " live";
+    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + done + " in approval · " + live + " live" + (archived ? " · " + archived + " archived" : "");
     $("#summary").textContent = text;
   }
 
@@ -425,60 +430,117 @@
     var scroll = board.scrollLeft;
     board.replaceChildren();
 
+    // Drop forgotten ticks (a task another person deleted).
+    Object.keys(selected).forEach(function (id) { if (!byId[id]) delete selected[id]; });
+    board.classList.toggle("archive-collapsed", !archiveOpen);
+
     STAGES.forEach(function (s) {
       var items = column(s.id);
-      var list = h("div", { class: "list" });
-      var col = h("section", { class: "col", "data-status": s.id, "aria-label": s.name },
-        h("div", { class: "col-head" },
-          h("span", { class: "dot" }),
-          h("h2", { class: "col-name", text: s.name }),
-          h("span", { class: "count", text: String(items.length) }),
-          h("button", { type: "button", class: "iconbtn", "aria-label": "Add a task to " + s.name, title: "Add a task here", text: "+", onclick: function () { openDialog(null, s.id); } })
-        ),
-        list
-      );
+      var isArchive = s.id === "archive";
+      var col;
+
+      if (isArchive && !archiveOpen) {
+        // A narrow strip. Click it to open the Archive, or drop a card on it to archive that card.
+        col = h("section", { class: "col collapsed", "data-status": s.id, "aria-label": s.name },
+          h("button", {
+            type: "button", class: "col-open", "aria-expanded": "false",
+            "aria-label": "Show Archive (" + items.length + (items.length === 1 ? " task)" : " tasks)"), title: "Show Archive",
+            onclick: toggleArchive
+          }, h("span", { class: "count", text: String(items.length) }), h("span", { class: "vname", text: s.name }))
+        );
+        col.addEventListener("dragover", function (e) {
+          if (!dragId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (placeholder.parentNode) placeholder.remove();
+          document.querySelectorAll(".col.over").forEach(function (c) { if (c !== col) c.classList.remove("over"); });
+          col.classList.add("over");
+        });
+        col.addEventListener("drop", function (e) { onDrop(e, s.id); });
+        col.addEventListener("dragleave", function (e) {
+          if (!col.contains(e.relatedTarget)) col.classList.remove("over");
+        });
+      } else {
+        var list = h("div", { class: "list" });
+        col = h("section", { class: "col", "data-status": s.id, "aria-label": s.name },
+          h("div", { class: "col-head" },
+            h("span", { class: "dot" }),
+            h("h2", { class: "col-name", text: s.name }),
+            h("span", { class: "count", text: String(items.length) }),
+            isArchive
+              ? h("button", { type: "button", class: "iconbtn", "aria-label": "Hide Archive", title: "Hide Archive", text: "−", onclick: toggleArchive })
+              : h("button", { type: "button", class: "iconbtn", "aria-label": "Add a task to " + s.name, title: "Add a task here", text: "+", onclick: function () { openDialog(null, s.id); } })
+          ),
+          list
+        );
+        if (!items.length) list.append(h("p", { class: "hint", text: isArchive ? "Drop older finished tasks here" : "Drop a task here or press +" }));
+        items.forEach(function (t) { list.append(cardEl(t)); });
+
+        list.addEventListener("dragover", function (e) { onDragOver(e, list, col, s.id); });
+        list.addEventListener("drop", function (e) { onDrop(e, s.id); });
+        col.addEventListener("dragleave", function (e) {
+          if (!col.contains(e.relatedTarget)) col.classList.remove("over");
+        });
+      }
       col.style.setProperty("--stage", "var(" + s.color + ")");
-
-      if (!items.length) list.append(h("p", { class: "hint", text: "Drop a task here or press +" }));
-      items.forEach(function (t) { list.append(cardEl(t)); });
-
-      list.addEventListener("dragover", function (e) { onDragOver(e, list, col, s.id); });
-      list.addEventListener("drop", function (e) { onDrop(e, s.id); });
-      col.addEventListener("dragleave", function (e) {
-        if (!col.contains(e.relatedTarget)) col.classList.remove("over");
-      });
       board.append(col);
     });
 
     board.scrollLeft = scroll;
+    updateSelBar();
     renderSummary();
     renderEmpty();
     fillOwners();
   }
 
+  function toggleArchive() {
+    archiveOpen = !archiveOpen;
+    lsSet("ttb-archive-open", archiveOpen ? "1" : "0");
+    render();
+    if (archiveOpen) {
+      var board = $("#board");
+      board.scrollTo({ left: board.scrollWidth, behavior: "smooth" });
+    }
+  }
+
   function cardEl(t) {
     var idx = stageIndex(t.status);
     var card = h("div", {
-      class: "card", tabindex: "0", role: "button", "data-id": t.id,
-      "aria-label": "Open task: " + t.title,
-      draggable: "true"
+      class: "card" + (selecting && selected[t.id] ? " selected" : ""), tabindex: "0", "data-id": t.id,
+      role: selecting ? "checkbox" : "button",
+      "aria-checked": selecting ? String(Boolean(selected[t.id])) : null,
+      "aria-label": (selecting ? "Select task: " : "Open task: ") + t.title,
+      draggable: selecting ? "false" : "true"
     });
+    if (selecting) card.append(h("span", { class: "sel-box", "aria-hidden": "true" }));
     card.append(h("h3", { text: t.title }));
+    // Copy button in the top right corner.
+    card.append(h("button", { type: "button", class: "iconbtn dup", text: "⧉", "aria-label": "Duplicate this task", title: "Duplicate this task", onclick: function (e) { e.stopPropagation(); duplicateTask(t); } }));
     if (t.notes) card.append(h("p", { class: "notes", text: t.notes }));
-    var cardLinks = findLinks(t.title + "\n" + t.notes);
+    // On the board only the first link shows; the task dialog lists them all.
+    var cardLinks = findLinks(t.title + "\n" + t.notes).slice(0, 1);
     if (cardLinks.length) {
       var linkRow = h("div", { class: "link-list small" });
       cardLinks.forEach(function (l) { linkRow.append(linkEl(l)); });
       card.append(linkRow);
     }
     if (t.images.length) {
+      // Two thumbnails, then a dark "+N" tile standing in for the rest.
       var thumbs = h("div", { class: "thumbs" });
-      t.images.forEach(function (im, n) {
+      t.images.slice(0, 2).forEach(function (im, n) {
         thumbs.append(h("button", {
           type: "button", class: "thumb", "aria-label": "View image " + (n + 1) + " of " + t.images.length,
           onclick: function (e) { e.stopPropagation(); openLightbox(t.images, n); }
         }, h("img", { src: thumbUrl(im.url), alt: "", loading: "lazy", draggable: "false" })));
       });
+      var extra = t.images.length - 2;
+      if (extra > 0) {
+        thumbs.append(h("button", {
+          type: "button", class: "thumb more", text: "+" + extra,
+          "aria-label": "View " + extra + " more " + (extra === 1 ? "image" : "images"),
+          onclick: function (e) { e.stopPropagation(); openLightbox(t.images, 2); }
+        }));
+      }
       card.append(thumbs);
     }
 
@@ -494,7 +556,7 @@
         dates.append(h("span", { class: "date due relaxed", text: "Take your time", title: "No fixed deadline" }));
       } else if (t.deadline) {
         // Past its deadline and not finished: say so in words as well as colour.
-        var late = t.deadline < todayLocal() && t.status !== "done" && t.status !== "live";
+        var late = t.deadline < todayLocal() && t.status !== "done" && t.status !== "live" && t.status !== "archive";
         dates.append(h("span", {
           class: "date due" + (late ? " overdue" : ""),
           text: (late ? "Overdue " : "Due ") + fmtDate(t.deadline),
@@ -507,19 +569,20 @@
     var prev = idx > 0 ? STAGES[idx - 1] : null;
     var next = idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
     foot.append(h("span", { class: "moves" },
-      h("button", { type: "button", class: "iconbtn", text: "⧉", "aria-label": "Duplicate this task", title: "Duplicate this task", onclick: function (e) { e.stopPropagation(); duplicateTask(t); } }),
       h("button", { type: "button", class: "iconbtn", text: "‹", disabled: prev ? null : true, "aria-label": prev ? "Move back to " + prev.name : "Already at the first stage", title: prev ? "Move back to " + prev.name : "", onclick: function (e) { e.stopPropagation(); if (prev) step(t, prev.id); } }),
       h("button", { type: "button", class: "iconbtn", text: "›", disabled: next ? null : true, "aria-label": next ? "Move forward to " + next.name : "Already at the last stage", title: next ? "Move forward to " + next.name : "", onclick: function (e) { e.stopPropagation(); if (next) step(t, next.id); } })
     ));
     card.append(foot);
 
+    // In select mode a click ticks the card instead of opening it.
     card.addEventListener("click", function (e) {
       if (e.target.closest(".moves")) return;
+      if (selecting) { toggleSelect(t.id); return; }
       openDialog(t.id);
     });
     card.addEventListener("keydown", function (e) {
       if (e.target !== card) return;
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDialog(t.id); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (selecting) toggleSelect(t.id); else openDialog(t.id); }
     });
     card.addEventListener("dragstart", function (e) {
       dragId = t.id;
@@ -609,6 +672,57 @@
     if (t.status !== status) patch.date = todayLocal();  // a real move stamps the date
     updateTask(id, patch);
   }
+
+  /* ---------- select several cards and move them together ---------- */
+
+  function updateSelBar() {
+    var n = Object.keys(selected).length;
+    $("#selCount").textContent = n + " selected";
+    $("#selMove").disabled = n === 0 || !$("#selStage").value;
+  }
+
+  function setSelecting(on) {
+    selecting = on;
+    selected = {};
+    document.body.classList.toggle("selecting", on);
+    $("#selectBtn").textContent = on ? "Cancel selection" : "Select";
+    $("#selectBtn").setAttribute("aria-pressed", String(on));
+    $("#selBar").hidden = !on;
+    $("#selStage").value = "";
+    render();
+  }
+
+  function toggleSelect(id) {
+    if (selected[id]) delete selected[id]; else selected[id] = true;
+    var card = document.querySelector('.card[data-id="' + id + '"]');
+    if (card) { card.classList.toggle("selected", Boolean(selected[id])); card.setAttribute("aria-checked", String(Boolean(selected[id]))); }
+    updateSelBar();
+  }
+
+  function moveSelected() {
+    var status = $("#selStage").value;
+    var stage = STAGES[stageIndex(status)];
+    if (!stage) return;
+    // Keep the cards in the order they were on the board, and put them at the end of the target column.
+    var ids = Object.keys(selected).filter(function (id) { return byId[id] && byId[id].status !== status; })
+      .sort(function (a, b) { return (stageIndex(byId[a].status) - stageIndex(byId[b].status)) || (byId[a].order - byId[b].order); });
+    if (!ids.length) { toast("Those cards are already in " + stage.name + "."); return; }
+    var base = Date.now();
+    var day = todayLocal();
+    ids.forEach(function (id, i) { updateTask(id, { status: status, order: base + i, date: day }); });
+    toast("Moved " + ids.length + (ids.length === 1 ? " card" : " cards") + " to " + stage.name + ".");
+    setSelecting(false);
+  }
+
+  $("#selectBtn").addEventListener("click", function () { setSelecting(!selecting); });
+  $("#selCancel").addEventListener("click", function () { setSelecting(false); });
+  $("#selMove").addEventListener("click", moveSelected);
+  $("#selStage").addEventListener("change", updateSelBar);
+  (function buildSelStage() {
+    var sel = $("#selStage");
+    sel.append(h("option", { value: "", text: "Move to…" }));
+    STAGES.forEach(function (s) { sel.append(h("option", { value: s.id, text: s.name })); });
+  })();
 
   // One-click copy: same details, placed right under the original in its column.
   function duplicateTask(t) {
@@ -894,6 +1008,7 @@
     if (e.key === "Escape") {
       if (!$("#lightbox").hidden) closeLightbox();
       else if (!$("#overlay").hidden) closeDialog(false);
+      else if (selecting) setSelecting(false);
     } else if (!$("#lightbox").hidden && (e.key === "ArrowLeft" || e.key === "ArrowRight") && lbList.length > 1) {
       stepLightbox(e.key === "ArrowLeft" ? -1 : 1);
     }

@@ -67,12 +67,12 @@ test("image ids must live in the configured folder", () => {
   }
 });
 
-test("board accepts up to 3 Cloudinary images and rejects anything else", () => {
-  const ok = applyOp(emptyBoard(), { type: "create", task: { title: "T", images: [img("a"), img("b"), img("c")] } }, 1, () => "t");
-  assert.equal(ok.task.images.length, 3);
+test("board accepts up to 6 Cloudinary images and rejects anything else", () => {
+  const ok = applyOp(emptyBoard(), { type: "create", task: { title: "T", images: [1, 2, 3, 4, 5, 6].map((n) => img("q" + n)) } }, 1, () => "t");
+  assert.equal(ok.task.images.length, 6);
   assert.deepEqual(applyOp(emptyBoard(), { type: "create", task: { title: "T" } }).task.images, []);
   const make = (images) => () => applyOp(emptyBoard(), { type: "create", task: { title: "T", images } });
-  assert.throws(make([img("a"), img("b"), img("c"), img("d")]), /Up to 3/);
+  assert.throws(make([1, 2, 3, 4, 5, 6, 7].map((n) => img("p" + n))), /Up to 6/);
   assert.throws(make([img("a"), img("a")]), /twice/);
   assert.throws(make([{ id: "team-task-board/a", url: "https://evil.example/pixel.gif" }]), /not valid/);
   assert.throws(make([{ id: "team-task-board/a", url: "https://res.cloudinary.com/demo/image/upload/other.jpg" }]), /not valid/);

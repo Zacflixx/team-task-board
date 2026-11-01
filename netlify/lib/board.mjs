@@ -1,8 +1,8 @@
 // Pure board logic: validation and the three operations (create, update, delete).
 // No network and no storage here, so it can be unit tested on its own.
 
-export const STATUSES = ["todo", "progress", "almost", "done", "live"];
-export const LIMITS = { title: 140, notes: 1000, owner: 40, tasks: 5000, images: 3 };
+export const STATUSES = ["todo", "progress", "almost", "done", "live", "archive"];
+export const LIMITS = { title: 140, notes: 1000, owner: 40, tasks: 5000, images: 6 };
 
 export class HttpError extends Error {
   constructor(status, message) {
