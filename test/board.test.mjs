@@ -274,3 +274,9 @@ test("deadline accepts the relaxed choice, which is never changed by a move and 
     assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { deadline: bad } }), /Date must look like/, bad);
   }
 });
+
+test("a new task may ask for a position, and rejects a bad one", () => {
+  assert.equal(applyOp(emptyBoard(), { type: "create", task: { title: "Copy", order: 42.5 } }, 1000, () => "a").task.order, 42.5);
+  assert.equal(applyOp(emptyBoard(), { type: "create", task: { title: "Normal" } }, 1000, () => "b").task.order, 1000);
+  assert.throws(() => applyOp(emptyBoard(), { type: "create", task: { title: "Bad", order: "first" } }), /Order must be a number/);
+});

@@ -1,7 +1,7 @@
 # Team Task Board
 
 A shared kanban board for a small team. Cards move through five stages:
-**Not started, In progress, Almost done, Done (Awaiting approval), Live.** Anyone with the team passcode can add, edit,
+**Not started, In progress, Almost done, Approval, Live.** Anyone with the team passcode can add, edit,
 drag and delete tasks. No separate database service is needed.
 
 ## How it works

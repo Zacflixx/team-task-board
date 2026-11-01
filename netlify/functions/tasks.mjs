@@ -129,7 +129,9 @@ export function createHandler({
           // Delete images that this change detached from the task (or the whole deleted task).
           const before = op.type === "create" ? null : board.tasks.find((t) => t.id === op.id);
           const kept = op.type === "delete" ? [] : imageIds(task);
-          const removed = imageIds(before).filter((id) => !kept.includes(id));
+          // Only delete an image from Cloudinary once no task uses it (a duplicated task shares its images).
+          const stillUsed = (id) => next.tasks.some((t) => imageIds(t).includes(id));
+          const removed = imageIds(before).filter((id) => !kept.includes(id) && !stillUsed(id));
           if (removed.length) await removeImages(removed, env);
           return reply(200, withFeatures({ ...next, task }));
         }

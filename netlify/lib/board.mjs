@@ -99,7 +99,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       deadline: optionalDeadline(input.deadline),
       images: optionalImages(input.images),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
-      order: now,
+      order: input.order === undefined ? now : requireOrder(input.order),  // a duplicate asks to sit next to its original
       createdAt: now,
       updatedAt: now
     };

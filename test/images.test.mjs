@@ -156,3 +156,19 @@ test("an uploaded-but-unsaved image can be removed, but one in use cannot", asyn
   assert.deepEqual(removed, ["team-task-board/unused"]);
   assert.equal((await call("DELETE", { id: "not-ours/x" }, { path: "/api/images" })).status, 400);
 });
+
+test("an image shared by a duplicated task is only deleted once no task uses it", async () => {
+  const { call, removed } = setup();
+  const first = await (await call("POST", { title: "Original", images: [img("shared")] })).json();
+  const copy = await (await call("POST", { title: "Original (copy)", images: [img("shared")] })).json();
+
+  // Deleting one of the two must not remove the picture the other still uses.
+  await call("DELETE", { id: first.task.id });
+  assert.deepEqual(removed, []);
+  const board = await (await call("GET")).json();
+  assert.equal(board.tasks[0].images[0].id, "team-task-board/shared");
+
+  // Deleting the last user finally removes it.
+  await call("DELETE", { id: copy.task.id });
+  assert.deepEqual(removed, ["team-task-board/shared"]);
+});

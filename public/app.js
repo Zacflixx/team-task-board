@@ -10,7 +10,7 @@
     { id: "todo", name: "Not started", color: "--s-todo" },
     { id: "progress", name: "In progress", color: "--s-prog" },
     { id: "almost", name: "Almost done", color: "--s-almost" },
-    { id: "done", name: "Done (Awaiting approval)", color: "--s-done" },
+    { id: "done", name: "Approval", color: "--s-done" },
     { id: "live", name: "Live", color: "--s-live" }
   ];
   var STAGE_IDS = STAGES.map(function (s) { return s.id; });
@@ -366,7 +366,7 @@
     var live = tasks.filter(function (t) { return t.status === "live"; }).length;
     var text;
     if (!total) text = loaded ? "Nothing tracked yet" : (locked ? "Locked" : (offline ? "Can't reach the board" : "Loading tasks"));
-    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + done + " done · " + live + " live";
+    else text = total + (total === 1 ? " task" : " tasks") + " · " + open + " open · " + done + " in approval · " + live + " live";
     $("#summary").textContent = text;
   }
 
@@ -507,6 +507,7 @@
     var prev = idx > 0 ? STAGES[idx - 1] : null;
     var next = idx < STAGES.length - 1 ? STAGES[idx + 1] : null;
     foot.append(h("span", { class: "moves" },
+      h("button", { type: "button", class: "iconbtn", text: "⧉", "aria-label": "Duplicate this task", title: "Duplicate this task", onclick: function (e) { e.stopPropagation(); duplicateTask(t); } }),
       h("button", { type: "button", class: "iconbtn", text: "‹", disabled: prev ? null : true, "aria-label": prev ? "Move back to " + prev.name : "Already at the first stage", title: prev ? "Move back to " + prev.name : "", onclick: function (e) { e.stopPropagation(); if (prev) step(t, prev.id); } }),
       h("button", { type: "button", class: "iconbtn", text: "›", disabled: next ? null : true, "aria-label": next ? "Move forward to " + next.name : "Already at the last stage", title: next ? "Move forward to " + next.name : "", onclick: function (e) { e.stopPropagation(); if (next) step(t, next.id); } })
     ));
@@ -607,6 +608,19 @@
     var patch = { status: status, order: order };
     if (t.status !== status) patch.date = todayLocal();  // a real move stamps the date
     updateTask(id, patch);
+  }
+
+  // One-click copy: same details, placed right under the original in its column.
+  function duplicateTask(t) {
+    var after = column(t.status).filter(function (x) { return x.order > t.order || (x.order === t.order && x.id > t.id); })[0];
+    var body = {
+      title: (t.title.length > 133 ? t.title.slice(0, 133) : t.title) + " (copy)",
+      notes: t.notes, owner: t.owner, status: t.status, deadline: t.deadline,
+      order: after ? (t.order + after.order) / 2 : t.order + 1
+    };
+    if (imagesEnabled && t.images.length) body.images = t.images;
+    enqueue(function () { return api("POST", body); })
+      .then(function (d) { settle(d); toast("Duplicated. Click the copy to rename it."); }, writeError);
   }
 
   function step(t, status) {
