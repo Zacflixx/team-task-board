@@ -38,29 +38,7 @@ img { max-width: 100%; }
   --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d0e1c;
-    --surface: #1a1b32;
-    --surface-2: #14152a;
-    --ink: #eceefb;
-    --muted: #9ea2c8;
-    --line: #2d2f54;
-    --accent: #8b7cff;
-    --accent-2: #e879f9;
-    --accent-ink: #12072a;
-    --danger: #ff8a80;
-    --scrim: rgba(0, 0, 0, 0.62);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.25);
-    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.4), 0 10px 26px rgba(0, 0, 0, 0.45);
-    --s-todo: #93a3c8;
-    --s-prog: #6aa2ff;
-    --s-almost: #ffb13b;
-    --s-done: #39d98a;
-    --s-live: #c58bff;
-    color-scheme: dark;
-  }
-}
+/* Light is the default. Dark only applies when <html data-theme="dark"> is set. */
 :root[data-theme="dark"] {
   --bg: #0d0e1c;
   --surface: #1a1b32;
