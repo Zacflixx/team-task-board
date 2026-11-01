@@ -68,12 +68,34 @@
   function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-  // Today in the viewer's own time zone, as YYYY-MM-DD (what a date input uses).
-  function todayLocal() {
-    var d = new Date();
+  // A date in the viewer's own time zone, as YYYY-MM-DD (what a date input uses).
+  function isoLocal(d) {
     var m = String(d.getMonth() + 1).padStart(2, "0");
     var day = String(d.getDate()).padStart(2, "0");
     return d.getFullYear() + "-" + m + "-" + day;
+  }
+  function todayLocal() { return isoLocal(new Date()); }
+
+  // The Deadline dropdown: each choice counts forward from today, and the task keeps the resulting date.
+  var DEADLINE_CHOICES = [
+    { value: "d1", label: "1 day (Urgent)", days: 1 },
+    { value: "d3", label: "3 days", days: 3 },
+    { value: "w1", label: "1 week", days: 7 },
+    { value: "w2", label: "2 weeks", days: 14 },
+    { value: "w3", label: "3 weeks", days: 21 },
+    { value: "m1", label: "1 month", months: 1 },
+    { value: "m2", label: "2 months", months: 2 },
+    { value: "relaxed", label: "Take Your Time!", fixed: "relaxed" }  // no date, never overdue
+  ];
+  function deadlineFromToday(choice) {
+    var d = new Date();
+    if (choice.days) d.setDate(d.getDate() + choice.days);
+    if (choice.months) {
+      var dayOfMonth = d.getDate();
+      d.setMonth(d.getMonth() + choice.months);
+      if (d.getDate() !== dayOfMonth) d.setDate(0);  // e.g. 31 Jan + 1 month -> end of Feb, not March
+    }
+    return isoLocal(d);
   }
   // "2026-03-05" -> "Mar 5" (with the year when it is not this year).
   function fmtDate(iso) {
@@ -167,7 +189,7 @@
         notes: typeof v.notes === "string" ? v.notes : "",
         owner: typeof v.owner === "string" ? v.owner : "",
         date: typeof v.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.date) ? v.date : "",
-        deadline: typeof v.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.deadline) ? v.deadline : "",
+        deadline: typeof v.deadline === "string" && (v.deadline === "relaxed" || /^\d{4}-\d{2}-\d{2}$/.test(v.deadline)) ? v.deadline : "",
         images: (Array.isArray(v.images) ? v.images : []).filter(function (i) {
           return i && typeof i.id === "string" && typeof i.url === "string" && i.url.indexOf("https://res.cloudinary.com/") === 0;
         }).slice(0, MAX_IMAGES).map(function (i) { return { id: i.id, url: i.url }; }),
@@ -421,7 +443,9 @@
     }
     if (t.deadline || t.date) {
       var dates = h("span", { class: "dates" });
-      if (t.deadline) {
+      if (t.deadline === "relaxed") {
+        dates.append(h("span", { class: "date due relaxed", text: "Take your time", title: "No fixed deadline" }));
+      } else if (t.deadline) {
         // Past its deadline and not finished: say so in words as well as colour.
         var late = t.deadline < todayLocal() && t.status !== "done" && t.status !== "live";
         dates.append(h("span", {
@@ -673,6 +697,29 @@
 
   /* ---------- add and edit dialog ---------- */
 
+  var dlgDeadline = "";  // the deadline the task had when the dialog opened
+
+  function fillDeadlineSelect(current) {
+    dlgDeadline = current;
+    var sel = $("#fDeadline");
+    sel.replaceChildren();
+    sel.append(h("option", { value: "", text: "No deadline" }));
+    // An existing date stays selected until another choice is picked.
+    var hasDate = current && current !== "relaxed";
+    if (hasDate) sel.append(h("option", { value: "keep", text: "Due " + fmtDate(current) + " (current)" }));
+    DEADLINE_CHOICES.forEach(function (c) { sel.append(h("option", { value: c.value, text: c.label })); });
+    sel.value = hasDate ? "keep" : (current === "relaxed" ? "relaxed" : "");
+  }
+
+  function chosenDeadline() {
+    var v = $("#fDeadline").value;
+    if (v === "") return "";
+    if (v === "keep") return dlgDeadline;
+    var choice = DEADLINE_CHOICES.filter(function (c) { return c.value === v; })[0];
+    if (!choice) return dlgDeadline;
+    return choice.fixed || deadlineFromToday(choice);
+  }
+
   function openDialog(id, status) {
     var t = id ? byId[id] : null;
     if (id && !t) return;
@@ -688,7 +735,7 @@
     $("#fOwner").value = t ? t.owner : lsGet("ttb-owner");
     sel.value = t ? t.status : (status || "todo");
     $("#fDate").value = t ? t.date : "";
-    $("#fDeadline").value = t ? t.deadline : "";
+    fillDeadlineSelect(t ? t.deadline : "");
     dlgImages = t ? t.images.slice() : [];
     dlgOriginal = dlgImages.map(function (i) { return i.id; });
     uploading = 0;
@@ -734,7 +781,7 @@
 
     if (editingId) {
       var cur = byId[editingId];
-      var patch = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: $("#fDeadline").value };
+      var patch = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: chosenDeadline() };
       if (imagesEnabled) patch.images = dlgImages;
       if (cur && cur.status !== status) {
         patch.order = Date.now();
@@ -749,7 +796,7 @@
 
     var btn = $("#saveBtn");
     btn.disabled = true;
-    var body = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: $("#fDeadline").value };
+    var body = { title: title, notes: notes, owner: owner, status: status, date: date, deadline: chosenDeadline() };
     if (imagesEnabled) body.images = dlgImages;
     enqueue(function () { return api("POST", body); })
       .then(function (d) { settle(d); closeDialog(true); }, function (err) { btn.disabled = false; writeError(err); });

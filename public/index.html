@@ -168,6 +168,7 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
 .date { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); background: color-mix(in srgb, var(--stage) 20%, transparent); padding: 1px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
 .date.due { background: transparent; border: 1px solid color-mix(in srgb, var(--stage) 55%, var(--line)); }
 .date.overdue { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); border-color: var(--danger); font-weight: 500; }
+.date.relaxed { color: var(--s-done); border-color: color-mix(in srgb, var(--s-done) 55%, var(--line)); }
 .dates-note { margin-top: -6px; }
 .field-note { color: var(--muted); font-size: 12px; }
 .thumbs { display: flex; gap: 6px; }
@@ -256,10 +257,10 @@ h1 { font-family: var(--font-display); font-weight: 700; font-size: 32px; line-h
       </div>
       <div class="field">
         <label for="fDeadline">Deadline (optional)</label>
-        <input id="fDeadline" type="date">
+        <select id="fDeadline"></select>
       </div>
     </div>
-    <small class="field-note dates-note">Date is set to today automatically whenever the task moves to another stage (you can still change it). Deadline only changes when you change it.</small>
+    <small class="field-note dates-note">Date is set to today automatically whenever the task moves to another stage (you can still change it). Deadline counts from the day you pick it and only changes when you pick a new one.</small>
     <div class="field" id="imgField" hidden>
       <label>Images (optional)</label>
       <div class="img-grid" id="imgGrid"></div>

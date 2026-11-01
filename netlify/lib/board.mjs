@@ -32,6 +32,11 @@ function optionalDate(value) {
   return value;
 }
 
+// A deadline is a calendar date, "" (none), or "relaxed" ("Take Your Time!": no fixed date, never overdue).
+function optionalDeadline(value) {
+  return value === "relaxed" ? "relaxed" : optionalDate(value);
+}
+
 // Images are stored on Cloudinary; a task keeps only [{ id, url }]. Only Cloudinary links are accepted.
 function optionalImages(value) {
   if (value === undefined || value === null) return [];
@@ -91,7 +96,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       notes: text(input.notes, LIMITS.notes),
       owner: text(input.owner, LIMITS.owner),
       date: optionalDate(input.date),
-      deadline: optionalDate(input.deadline),
+      deadline: optionalDeadline(input.deadline),
       images: optionalImages(input.images),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
       order: now,
@@ -117,7 +122,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
     if ("status" in patch) next.status = requireStatus(patch.status);
     if ("date" in patch) next.date = optionalDate(patch.date);
     // The deadline is only ever changed by hand; moving a task never touches it.
-    if ("deadline" in patch) next.deadline = optionalDate(patch.deadline);
+    if ("deadline" in patch) next.deadline = optionalDeadline(patch.deadline);
     if ("images" in patch) next.images = optionalImages(patch.images);
     // A move to another stage stamps today's date, unless the caller set a date itself.
     if (next.status !== tasks[index].status && !("date" in patch)) {

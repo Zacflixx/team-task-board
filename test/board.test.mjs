@@ -263,3 +263,14 @@ test("deadline is optional, validated, and never changed by moving a task", () =
   assert.equal(applyOp(start, { type: "update", id: "a", patch: { deadline: "2026-07-15" } }).task.deadline, "2026-07-15");
   assert.equal(applyOp(start, { type: "update", id: "a", patch: { deadline: "" } }).task.deadline, "");
 });
+
+test("deadline accepts the relaxed choice, which is never changed by a move and is exact-match only", () => {
+  const start = applyOp(emptyBoard(), { type: "create", task: { title: "One", deadline: "relaxed" } }, 1, () => "a").board;
+  assert.equal(start.tasks[0].deadline, "relaxed");
+  const moved = applyOp(start, { type: "update", id: "a", patch: { status: "done" } }, Date.parse("2026-04-01T12:00:00Z")).task;
+  assert.equal(moved.deadline, "relaxed");
+  assert.equal(applyOp(start, { type: "update", id: "a", patch: { deadline: "2026-09-01" } }).task.deadline, "2026-09-01");
+  for (const bad of ["Relaxed", "RELAXED", "relaxed ", "whenever"]) {
+    assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { deadline: bad } }), /Date must look like/, bad);
+  }
+});
