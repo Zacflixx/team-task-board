@@ -570,7 +570,9 @@
         else dlgImages.push(img);
       }, function (e) {
         if (e && e.code === "locked") return;
-        toast(e && e.status === 501 ? "Images are not set up yet." : "Couldn't upload that image. Try again.");
+        console.error("Image upload failed:", e);
+        var why = e && e.message ? " (" + String(e.message).slice(0, 120) + ")" : "";
+        toast(e && e.status === 501 ? "Images are not set up yet." : "Couldn't upload that image" + why);
       }).then(function () { uploading--; renderDlgImages(); });
     });
   }
