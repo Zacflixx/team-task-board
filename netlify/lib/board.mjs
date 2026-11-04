@@ -1,7 +1,34 @@
 // Pure board logic: validation and the three operations (create, update, delete).
 // No network and no storage here, so it can be unit tested on its own.
 
-export const STATUSES = ["todo", "progress", "almost", "done", "live", "archive"];
+export const STATUSES = ["todo", "progress", "done", "live", "archive"];
+
+// Stages that were removed, and the stage their tasks move to.
+const RETIRED_STAGES = { almost: "progress" };
+
+// A task that has sat in Live this long without changing stage moves to Archive by itself.
+export const AUTO_ARCHIVE_DAYS = 7;
+
+// Housekeeping done whenever the board is read:
+//  - move tasks out of removed stages,
+//  - archive tasks that have been in Live for AUTO_ARCHIVE_DAYS without changing stage.
+// "Since" is the moment the task last changed stage (movedAt); older tasks fall back to their last update.
+// Returns the same board untouched when there is nothing to do, otherwise a new board with a higher revision.
+export function refreshBoard(board, now = Date.now()) {
+  const staleBefore = now - AUTO_ARCHIVE_DAYS * 24 * 60 * 60 * 1000;
+  let changed = false;
+  const tasks = board.tasks.map((t) => {
+    let task = t;
+    if (RETIRED_STAGES[task.status]) task = { ...task, status: RETIRED_STAGES[task.status] };
+    const since = task.movedAt ?? task.updatedAt ?? task.createdAt ?? now;
+    if (task.status === "live" && since <= staleBefore) {
+      task = { ...task, status: "archive", movedAt: now, date: new Date(now).toISOString().slice(0, 10) };
+    }
+    if (task !== t) changed = true;
+    return task;
+  });
+  return changed ? { board: { ...board, rev: board.rev + 1, tasks }, changed: true } : { board, changed: false };
+}
 export const LIMITS = { title: 140, notes: 1000, owner: 40, tasks: 5000, images: 6 };
 
 export class HttpError extends Error {
@@ -100,6 +127,7 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
       images: optionalImages(input.images),
       status: input.status === undefined ? "todo" : requireStatus(input.status),
       order: input.order === undefined ? now : requireOrder(input.order),  // a duplicate asks to sit next to its original
+      movedAt: now,  // when it last changed stage; drives the automatic archive
       createdAt: now,
       updatedAt: now
     };
@@ -125,8 +153,9 @@ export function applyOp(board, op, now = Date.now(), makeId = () => crypto.rando
     if ("deadline" in patch) next.deadline = optionalDeadline(patch.deadline);
     if ("images" in patch) next.images = optionalImages(patch.images);
     // A move to another stage stamps today's date, unless the caller set a date itself.
-    if (next.status !== tasks[index].status && !("date" in patch)) {
-      next.date = new Date(now).toISOString().slice(0, 10);
+    if (next.status !== tasks[index].status) {
+      next.movedAt = now;
+      if (!("date" in patch)) next.date = new Date(now).toISOString().slice(0, 10);
     }
     if ("order" in patch) next.order = requireOrder(patch.order);
     next.updatedAt = now;

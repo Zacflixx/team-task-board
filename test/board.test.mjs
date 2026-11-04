@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyOp, emptyBoard, HttpError } from "../netlify/lib/board.mjs";
+import { applyOp, emptyBoard, refreshBoard, HttpError } from "../netlify/lib/board.mjs";
 import { createHandler } from "../netlify/functions/tasks.mjs";
 import { snapshot, backupToGitHub } from "../netlify/lib/backup.mjs";
 
@@ -40,7 +40,7 @@ function call(handler, method, body, { passcode = "open-sesame", query = "" } = 
 test("create trims text, defaults to Not started and bumps the revision", () => {
   const { board, task } = applyOp(emptyBoard(), { type: "create", task: { title: "  Ship it  ", owner: " Sam " } }, 1000, () => "a");
   assert.equal(board.rev, 1);
-  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", deadline: "", images: [], status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
+  assert.deepEqual(task, { id: "a", title: "Ship it", notes: "", owner: "Sam", date: "", deadline: "", images: [], movedAt: 1000, status: "todo", order: 1000, createdAt: 1000, updatedAt: 1000 });
 });
 
 test("create rejects an empty title and an unknown stage", () => {
@@ -287,4 +287,87 @@ test("Archive is a valid stage and archiving keeps the task, stamping the date",
   assert.equal(task.status, "archive");
   assert.equal(task.date, "2026-06-01");
   assert.throws(() => applyOp(start, { type: "update", id: "a", patch: { status: "archived" } }), /Unknown stage/);
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+const T = Date.parse("2026-11-10T12:00:00Z");
+const task = (id, status, extra = {}) => ({ id, title: id, notes: "", owner: "", date: "", deadline: "", images: [], status, order: 1, createdAt: 1, updatedAt: 1, ...extra });
+
+test("the removed Almost done stage is rejected, and its tasks move to In progress", () => {
+  assert.throws(() => applyOp(emptyBoard(), { type: "create", task: { title: "x", status: "almost" } }), /Unknown stage/);
+
+  const board = { rev: 4, tasks: [task("a", "almost", { movedAt: T }), task("b", "todo", { movedAt: T })] };
+  const { board: fixed, changed } = refreshBoard(board, T);
+  assert.equal(changed, true);
+  assert.equal(fixed.rev, 5);
+  assert.deepEqual(fixed.tasks.map((t) => t.status), ["progress", "todo"]);
+  assert.equal(board.tasks[0].status, "almost");  // the input is not mutated
+
+  const again = refreshBoard(fixed, T);
+  assert.equal(again.changed, false);
+  assert.equal(again.board, fixed);
+});
+
+test("a task in Live for a week with no change of stage is archived automatically", () => {
+  const board = { rev: 1, tasks: [
+    task("old", "live", { movedAt: T - 8 * DAY }),
+    task("exactly", "live", { movedAt: T - 7 * DAY }),
+    task("fresh", "live", { movedAt: T - 6 * DAY }),
+    task("old-todo", "todo", { movedAt: T - 30 * DAY }),
+    task("old-approval", "done", { movedAt: T - 30 * DAY }),
+    task("no-movedAt", "live", { updatedAt: T - 9 * DAY }),
+    task("edited-but-not-moved", "live", { movedAt: T - 9 * DAY, updatedAt: T - 1 * DAY })
+  ] };
+  const { board: next, changed } = refreshBoard(board, T);
+  assert.equal(changed, true);
+  const status = Object.fromEntries(next.tasks.map((t) => [t.id, t.status]));
+  assert.deepEqual(status, {
+    old: "archive", exactly: "archive", fresh: "live", "old-todo": "todo", "old-approval": "done",
+    "no-movedAt": "archive", "edited-but-not-moved": "archive"
+  });
+  const archived = next.tasks.find((t) => t.id === "old");
+  assert.equal(archived.date, "2026-11-10");
+  assert.equal(archived.movedAt, T);
+  assert.equal(next.rev, 2);
+});
+
+test("movedAt is stamped on create and on a change of stage, but not on other edits", () => {
+  const start = applyOp(emptyBoard(), { type: "create", task: { title: "One" } }, 100, () => "a").board;
+  assert.equal(start.tasks[0].movedAt, 100);
+  const edited = applyOp(start, { type: "update", id: "a", patch: { title: "Two" } }, 500).board;
+  assert.equal(edited.tasks[0].movedAt, 100);
+  const sameStage = applyOp(edited, { type: "update", id: "a", patch: { status: "todo" } }, 600).board;
+  assert.equal(sameStage.tasks[0].movedAt, 100);
+  const moved = applyOp(sameStage, { type: "update", id: "a", patch: { status: "live" } }, 900).board;
+  assert.equal(moved.tasks[0].movedAt, 900);
+});
+
+test("the handler tidies the board when it is read, saves it once, and bumps the revision", async () => {
+  const store = fakeStore();
+  const backups = [];
+  const handler = createHandler({ openStore: () => store, env, backup: async (b) => { backups.push(b.rev); return { ok: true }; } });
+  await store.setJSON("board", { rev: 7, tasks: [
+    task("a", "almost", { movedAt: Date.now() }),
+    task("b", "live", { movedAt: Date.now() - 8 * DAY }),
+    task("c", "live", { movedAt: Date.now() })
+  ] });
+
+  // A page that already had revision 7 must not be told "unchanged".
+  const res = await call(handler, "GET", undefined, { query: "?rev=7" });
+  const body = await res.json();
+  assert.equal(body.unchanged, undefined);
+  assert.equal(body.rev, 8);
+  assert.deepEqual(body.tasks.map((t) => t.status), ["progress", "archive", "live"]);
+
+  // It was saved, so the next read is quiet and nothing is saved twice.
+  assert.deepEqual(store._raw().tasks.map((t) => t.status), ["progress", "archive", "live"]);
+  assert.equal(store._raw().rev, 8);
+  assert.deepEqual(backups, [8]);
+  assert.deepEqual(await (await call(handler, "GET", undefined, { query: "?rev=8" })).json(), { rev: 8, unchanged: true });
+  assert.deepEqual(backups, [8]);
+
+  // A normal save builds on the tidied board.
+  const created = await (await call(handler, "POST", { title: "New" })).json();
+  assert.equal(created.rev, 9);
+  assert.equal(created.tasks.length, 4);
 });

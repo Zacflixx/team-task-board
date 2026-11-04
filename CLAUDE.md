@@ -1,7 +1,7 @@
 # Team Task Board
 
 Shared kanban board for a small team, hosted on Netlify. Stages: Not started, In progress,
-Almost done, Approval, Live, and a collapsed Archive. Everyone with the team passcode can add, edit, drag and delete tasks.
+Approval, Live, and a collapsed Archive. Everyone with the team passcode can add, edit, drag and delete tasks.
 
 ## Architecture
 
@@ -9,6 +9,7 @@ Almost done, Approval, Live, and a collapsed Archive. Everyone with the team pas
 - `netlify/functions/tasks.mjs`: the only backend. One Netlify Function (v2, Web `Request`/`Response`) at `/api/tasks` (GET, POST, PATCH, DELETE). Every call needs the `x-team-passcode` header, compared in constant time with `process.env.TEAM_PASSCODE`.
 - Storage: Netlify Blobs, store `team-task-board`, key `board`, strong consistency. The whole board is one JSON document `{ rev, tasks: [...] }`. Writes read the document, apply one operation, and save with `onlyIfMatch: etag` (or `onlyIfNew`), retrying on conflict.
 - `netlify/lib/board.mjs`: pure validation and operations. No I/O. Keep it that way so it stays easy to test.
+- Housekeeping on every read (`refreshBoard` in `board.mjs`): tasks in a removed stage move to its replacement, and tasks in Live for 7 days (`movedAt`, set on create and on every change of stage) move to Archive. The result is saved once, so every open page sees it, and the backup records it.
 - `netlify/lib/backup.mjs`: optional commit of the full board to `tasks.json` in a separate GitHub repo after every successful save. Failures are logged and never fail a save.
 - `netlify/lib/cloudinary.mjs`: optional image attachments. The browser asks `/api/images` (same function) for a signed upload permission, then uploads straight to Cloudinary; a task stores only `images: [{ id, url }]` (max 6). Images are public links. Removing an image or deleting a task deletes it from Cloudinary (best effort). Switched off unless all three `CLOUDINARY_*` variables are set.
 - `docs/claude-artifact-version.html`: the earlier single-file version that ran inside Claude. Reference only. Do not ship it.

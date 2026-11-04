@@ -9,7 +9,6 @@
   var STAGES = [
     { id: "todo", name: "Not started", color: "--s-todo" },
     { id: "progress", name: "In progress", color: "--s-prog" },
-    { id: "almost", name: "Almost done", color: "--s-almost" },
     { id: "done", name: "Approval", color: "--s-done" },
     { id: "live", name: "Live", color: "--s-live" },
     { id: "archive", name: "Archive", color: "--s-archive" }  // older finished work; collapsed by default
@@ -237,7 +236,7 @@
         images: (Array.isArray(v.images) ? v.images : []).filter(function (i) {
           return i && typeof i.id === "string" && typeof i.url === "string" && i.url.indexOf("https://res.cloudinary.com/") === 0;
         }).slice(0, MAX_IMAGES).map(function (i) { return { id: i.id, url: i.url }; }),
-        status: STAGE_IDS.indexOf(v.status) >= 0 ? v.status : "todo",
+        status: v.status === "almost" ? "progress" : (STAGE_IDS.indexOf(v.status) >= 0 ? v.status : "todo"),  // "almost" was removed
         order: typeof v.order === "number" ? v.order : 0
       };
     });

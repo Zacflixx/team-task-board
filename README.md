@@ -1,7 +1,7 @@
 # Team Task Board
 
 A shared kanban board for a small team. Cards move through five stages:
-**Not started, In progress, Almost done, Approval, Live,** plus a collapsed **Archive** for older finished work. Anyone with the team passcode can add, edit,
+**Not started, In progress, Approval, Live,** plus a collapsed **Archive** for older finished work. Anyone with the team passcode can add, edit,
 drag and delete tasks. No separate database service is needed.
 
 ## How it works
@@ -99,6 +99,7 @@ npm test                  # unit tests for the board logic and the API handler
 
 - **One shared passcode, no personal accounts.** Anyone who has it can change anything. Use a long one, and change it when someone leaves the team.
 - **Archive, Select and Duplicate.** The Archive column starts collapsed (click the strip at the right edge to open it; each person's choice is remembered). "Select" next to the sync indicator lets you tick several cards and move them together. The copy icon on a card duplicates it; the copy shares the original's pictures, which are only deleted from Cloudinary when no task uses them.
+- **Automatic archive.** A card that has sat in Live for 7 days without changing stage moves to Archive by itself (its Date becomes that day). It happens when someone opens the board, so a quiet week is caught up at the next visit. Editing a card does not restart the 7 days; moving it does.
 - **Owner is free text.** It is a name typed on the card, not a login.
 - **Updates are not instant for other people.** Your own moves show at once. A teammate sees them within about 8 seconds.
 - **Limits.** Up to 5,000 tasks; titles 140 characters, notes 1,000, owner 40.

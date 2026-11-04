@@ -9,7 +9,7 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { getStore } from "@netlify/blobs";
-import { applyOp, emptyBoard, HttpError } from "../lib/board.mjs";
+import { applyOp, emptyBoard, refreshBoard, HttpError } from "../lib/board.mjs";
 import { backupToGitHub } from "../lib/backup.mjs";
 import { cloudinaryEnabled, uploadPermission, validImageId, deleteImages } from "../lib/cloudinary.mjs";
 
@@ -57,6 +57,14 @@ export function createHandler({
   const withFeatures = (board) => (cloudinaryEnabled(env) ? { ...board, features: { images: true } } : board);
   const imageIds = (task) => ((task && task.images) || []).map((i) => i.id);
 
+  // Read the board after housekeeping (removed stages, automatic archive). Writes build on the tidied board.
+  async function readBoard(store) {
+    const current = await store.getWithMetadata(KEY, { type: "json" });
+    if (!current) return { current: null, board: emptyBoard(), changed: false };
+    const { board, changed } = refreshBoard(current.data);
+    return { current, board, changed };
+  }
+
   return async function handler(req) {
     try {
       if (!env.TEAM_PASSCODE) {
@@ -85,8 +93,15 @@ export function createHandler({
       }
 
       if (req.method === "GET") {
-        const current = await store.getWithMetadata(KEY, { type: "json" });
-        const board = current ? current.data : emptyBoard();
+        const { current, board, changed } = await readBoard(store);
+        if (changed) {
+          // Save the tidy-up once (its revision changes, so every open page picks it up).
+          // If someone saved at the same moment this is skipped and redone on the next read.
+          try {
+            const saved = await store.setJSON(KEY, board, { onlyIfMatch: current.etag });
+            if (saved.modified) await backup(board, env);
+          } catch (error) { console.error("Board tidy-up not saved:", error.message); }
+        }
         const since = Number(new URL(req.url).searchParams.get("rev"));
         if (Number.isFinite(since) && since === board.rev && current) {
           return reply(200, withFeatures({ rev: board.rev, unchanged: true }));
@@ -116,8 +131,7 @@ export function createHandler({
       }
 
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const current = await store.getWithMetadata(KEY, { type: "json" });
-        const board = current ? current.data : emptyBoard();
+        const { current, board } = await readBoard(store);
         const { board: next, task } = applyOp(board, op);
         const result = await store.setJSON(
           KEY,
